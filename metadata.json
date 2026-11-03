@@ -1,0 +1,7 @@
+{
+  "name": "AladdinSniper V1.7.01",
+  "description": "Advanced AI-powered trading chart scanner for Binary Options, Live, and OTC markets.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
