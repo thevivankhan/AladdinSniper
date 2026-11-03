@@ -1628,12 +1628,13 @@ export const PocketSniperApp: React.FC = () => {
                 /* Primary Trading Action Buttons (BUY/SELL or WIN/LOSS with Center Mode Switch Button) */
                 <div className="space-y-2">
                   {tradeActionMode === 'BUY_SELL' ? (
-                    <div className="flex items-center gap-2">
+                    <div key="mode-buy-sell" className="flex items-center gap-2">
                       {/* BUY / CALL BUTTON */}
                       <button
+                        key="btn-buy"
                         onClick={() => handleExecuteOrder('BUY')}
                         disabled={!sessionActive || winsLeft === 0 || tradesRemaining === 0 || currentBalance < minStakeLimit}
-                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.35)] active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none touch-manipulation"
                       >
                         <TrendingUp className="w-4 h-4 stroke-[2.5] shrink-0" />
                         <span className="truncate">BUY ${nextStake.toFixed(2)}</span>
@@ -1641,11 +1642,12 @@ export const PocketSniperApp: React.FC = () => {
 
                       {/* CIRCULAR GLOWING MODE SWITCH BUTTON */}
                       <button
+                        key="btn-switch-to-winloss"
                         onClick={() => {
                           if (soundEnabled) playTone('click');
                           setTradeActionMode((m) => (m === 'BUY_SELL' ? 'WIN_LOSS' : 'BUY_SELL'));
                         }}
-                        className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#1c2438] via-[#101624] to-[#0a0e18] border-2 border-amber-400/80 hover:border-amber-300 text-amber-300 hover:text-white flex items-center justify-center shadow-[0_0_16px_rgba(245,158,11,0.5)] hover:shadow-[0_0_22px_rgba(245,158,11,0.8)] active:scale-95 transition-all shrink-0 cursor-pointer group"
+                        className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#1c2438] via-[#101624] to-[#0a0e18] border-2 border-amber-400/80 hover:border-amber-300 text-amber-300 hover:text-white flex items-center justify-center shadow-[0_0_16px_rgba(245,158,11,0.5)] hover:shadow-[0_0_22px_rgba(245,158,11,0.8)] active:scale-95 transition-transform shrink-0 cursor-pointer group select-none touch-manipulation"
                         title="Switch to WIN / LOSS mode"
                       >
                         <span className="absolute -inset-1 rounded-full border border-amber-400/30 animate-pulse pointer-events-none" />
@@ -1654,21 +1656,23 @@ export const PocketSniperApp: React.FC = () => {
 
                       {/* SELL / PUT BUTTON */}
                       <button
+                        key="btn-sell"
                         onClick={() => handleExecuteOrder('SELL')}
                         disabled={!sessionActive || winsLeft === 0 || tradesRemaining === 0 || currentBalance < minStakeLimit}
-                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-rose-400/80 shadow-[0_0_15px_rgba(244,63,94,0.35)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-rose-400/80 shadow-[0_0_15px_rgba(244,63,94,0.35)] active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none touch-manipulation"
                       >
                         <TrendingDown className="w-4 h-4 stroke-[2.5] shrink-0" />
                         <span className="truncate">SELL ${nextStake.toFixed(2)}</span>
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div key="mode-win-loss" className="flex items-center gap-2">
                       {/* WIN OUTCOME BUTTON */}
                       <button
+                        key="btn-win"
                         onClick={() => recordTradeOutcome('WIN')}
                         disabled={!sessionActive || winsLeft === 0 || tradesRemaining === 0}
-                        className="flex-1 py-3 px-2 rounded-[4px] bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 border border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs flex items-center justify-center gap-1.5 border border-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none touch-manipulation"
                       >
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span className="truncate">WIN (+${(nextStake * (payoutRate / 100)).toFixed(2)})</span>
@@ -1676,11 +1680,12 @@ export const PocketSniperApp: React.FC = () => {
 
                       {/* CIRCULAR GLOWING MODE SWITCH BUTTON */}
                       <button
+                        key="btn-switch-to-buysell"
                         onClick={() => {
                           if (soundEnabled) playTone('click');
                           setTradeActionMode((m) => (m === 'BUY_SELL' ? 'WIN_LOSS' : 'BUY_SELL'));
                         }}
-                        className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#1c2438] via-[#101624] to-[#0a0e18] border-2 border-cyan-400/80 hover:border-cyan-300 text-cyan-300 hover:text-white flex items-center justify-center shadow-[0_0_16px_rgba(6,182,212,0.5)] hover:shadow-[0_0_22px_rgba(6,182,212,0.8)] active:scale-95 transition-all shrink-0 cursor-pointer group"
+                        className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#1c2438] via-[#101624] to-[#0a0e18] border-2 border-cyan-400/80 hover:border-cyan-300 text-cyan-300 hover:text-white flex items-center justify-center shadow-[0_0_16px_rgba(6,182,212,0.5)] hover:shadow-[0_0_22px_rgba(6,182,212,0.8)] active:scale-95 transition-transform shrink-0 cursor-pointer group select-none touch-manipulation"
                         title="Switch to BUY / SELL mode"
                       >
                         <span className="absolute -inset-1 rounded-full border border-cyan-400/30 animate-pulse pointer-events-none" />
@@ -1689,9 +1694,10 @@ export const PocketSniperApp: React.FC = () => {
 
                       {/* LOSS OUTCOME BUTTON */}
                       <button
+                        key="btn-loss"
                         onClick={() => recordTradeOutcome('LOSS')}
                         disabled={!sessionActive || winsLeft === 0 || tradesRemaining === 0}
-                        className="flex-1 py-3 px-2 rounded-[4px] bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center justify-center gap-1.5 border border-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.3)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="flex-1 py-3 px-2 rounded-[4px] bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-xs flex items-center justify-center gap-1.5 border border-rose-400/80 shadow-[0_0_12px_rgba(244,63,94,0.3)] active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none touch-manipulation"
                       >
                         <AlertTriangle className="w-4 h-4 shrink-0" />
                         <span className="truncate">LOSS (-${nextStake.toFixed(2)})</span>
