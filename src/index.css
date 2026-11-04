@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+html, body {
+  background-color: #050914;
+  color: #f1f5f9;
+  overscroll-behavior-y: none;
+  accent-color: #06b6d4;
+}
+
 @theme {
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --glow-emerald: 0 0 15px rgba(16, 185, 129, 0.4);

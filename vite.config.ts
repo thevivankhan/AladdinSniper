@@ -20,7 +20,7 @@ export default defineConfig(({mode}) => {
           name: 'Aladdin AI',
           short_name: 'Aladdin AI',
           description: 'Advanced AI Trading & Market Analysis Platform',
-          theme_color: '#d97706',
+          theme_color: '#050914',
           background_color: '#050914',
           display: 'standalone',
           icons: [
