@@ -15,6 +15,9 @@ export default defineConfig(({mode}) => {
         includeAssets: ['icon.svg', 'favicon.ico', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'aladdin-gold-icon.png'],
         workbox: {
           maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
         },
         manifest: {
           name: 'Aladdin AI',
