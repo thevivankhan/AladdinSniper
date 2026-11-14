@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie (Auto-Updating Loader) -> Pocket Option
 // @namespace    https://aladdinsniper.io
-// @version      7.5.0
-// @description  Permanent Auto-Loader v7.5.0 for AladdinGenie. Loads Full Trade Manager + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner with CSP-bypass telemetry.
+// @version      7.6.0
+// @description  Permanent Auto-Loader v7.6.0 for AladdinGenie. Loads Full Trade Manager (Tools, Audio/Voice Synth, Fireworks, HD Share Card) + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner with CSP-bypass telemetry.
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -308,7 +308,7 @@
     try {
       const fn = new Function(codeText);
       fn();
-      console.log('[AladdinGenie Loader v7.5.0] Mounted from:', sourceLabel);
+      console.log('[AladdinGenie Loader v7.6.0] Mounted from:', sourceLabel);
     } catch (e) {
       executed = false;
       console.error('[Aladdin Genie Loader] Execution error:', e);

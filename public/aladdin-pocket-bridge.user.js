@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie -> Pocket Option Floating Bot Overlay (Lemur & Quetta Edition)
 // @namespace    https://aladdinsniper.io
-// @version      7.5.0
-// @description  AladdinGenie Pro v7.5.0: Full Trade Manager + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner
+// @version      7.6.0
+// @description  AladdinGenie Pro v7.6.0: Full 1:1 Trade Manager (incl. Tools, Audio/Voice Synth, Fireworks, HD P&L Share) + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -24,7 +24,7 @@
   if (window.__ALADDIN_GENIE_INJECTED__) return;
   window.__ALADDIN_GENIE_INJECTED__ = true;
 
-  console.log('[AladdinGenie] v7.5.0 PRO Initializing (Trade Manager + 333/444 + Paradox + 60-Candle Hybrid Viewfinder)');
+  console.log('[AladdinGenie] v7.6.0 PRO Initializing (1:1 Trade Manager + Tools/Synth/Share/Fireworks + 333/444 + Paradox + 60-Candle Hybrid Viewfinder)');
 
   // =========================================================================
   // 1. REAL-TIME STATE & PERSISTENCE (ZERO DUMMY / ZERO Math.sin SIMULATION)
@@ -99,7 +99,7 @@
   ];
 
   let tmState = {
-    activeSubTab: 'trade', // 'trade' | 'settings' | 'session_log' | 'calendar' | 'schedule' | 'matrix'
+    activeSubTab: 'trade', // 'trade' | 'settings' | 'session_log' | 'calendar' | 'schedule' | 'matrix' | 'tools'
     balance: 2131.89,
     sessionStartBalance: 2131.89,
     currentBalance: 2131.89,
@@ -203,6 +203,69 @@
     timerLeft: 0,
     timerType: 'session',
     useLivePayout: false
+  };
+
+  // -------------------------------------------------------------------------
+  // TOOLS, AUDIO/VOICE SYNTHESIZER, THEME, FIREWORKS & P&L SHARE STATE
+  // -------------------------------------------------------------------------
+  let toolsState = {
+    soundEnabled: true,
+    soundVolume: 0.85,
+    toneStyle: 'sniper', // 'sniper' | 'arcade' | 'zen' | 'cyberpunk'
+    soundCategories: {
+      signals: true,
+      wins: true,
+      losses: true,
+      milestones: true,
+      clicks: true,
+      countdown: true
+    },
+    voiceLanguage: 'English', // 'English' | 'Hindi'
+    voiceAnnounceEnabled: true,
+    currentTheme: 'dark', // 'dark' | 'sniper' | 'arcade' | 'zen' | 'cyberpunk' | 'light' | 'gold'
+    fireworksVariant: 'golden_royal', // 'golden_royal' | 'rockets' | 'dolls' | 'arcade'
+    webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
+    apiKey: 'pk_live_aladdin_sniper_92'
+  };
+
+  let toolsUIState = {
+    showApiKey: false,
+    copiedKey: false,
+    pingStatus: 'idle',
+    pingLatency: null,
+    showPayloadModal: false,
+    saveFeedback: false,
+    resetFeedback: false,
+    confirmClearLogs: false,
+    exportNotice: null,
+    activeAudioEvent: '',
+    isAudioPlaying: false,
+    fireworksThemeIdx: 0
+  };
+
+  let fwState = {
+    open: false,
+    variant: 'golden_royal',
+    title: 'TARGET ACHIEVED',
+    winProfit: 0,
+    winRate: 100,
+    currentBalance: 0,
+    startBalance: 0,
+    winsCount: 0,
+    lossesCount: 0,
+    assetName: 'Pocket Option OTC',
+    salvoCount: 1,
+    animId: null
+  };
+
+  let pnlShareState = {
+    open: false,
+    format: 'mobile', // 'mobile' | 'desktop' | 'square'
+    theme: 'rocket',  // 'rocket' | 'bitcoin' | 'gold' | 'celebration' | 'sky' | 'cyber' | 'obsidian'
+    data: null,
+    copiedText: false,
+    copiedImage: false,
+    toastMsg: null
   };
 
   // Live Self-Audited Signal Accuracy State
@@ -324,8 +387,22 @@
             completedSessions: Array.isArray(st.pxState.completedSessions) ? st.pxState.completedSessions : []
           };
         }
+        if (st.toolsState && typeof st.toolsState === 'object') {
+          toolsState = {
+            ...toolsState,
+            ...st.toolsState,
+            soundCategories: {
+              ...toolsState.soundCategories,
+              ...(st.toolsState.soundCategories || {})
+            }
+          };
+          audioEnabled = toolsState.soundEnabled !== false;
+        }
         if (Array.isArray(st.recentTrades)) recentTrades = st.recentTrades.slice(0, 30);
-        if (typeof st.audioEnabled === 'boolean') audioEnabled = st.audioEnabled;
+        if (typeof st.audioEnabled === 'boolean') {
+          audioEnabled = st.audioEnabled;
+          toolsState.soundEnabled = audioEnabled;
+        }
         if (st.signalMode === 'ACTIVE' || st.signalMode === 'BALANCED' || st.signalMode === 'SNIPER') signalMode = st.signalMode;
         if (st.currentTimeframe && TIMEFRAME_SECONDS[st.currentTimeframe]) currentTimeframe = st.currentTimeframe;
         if (st.currentExpiry && TIMEFRAME_SECONDS[st.currentExpiry]) currentExpiry = st.currentExpiry;
@@ -339,6 +416,9 @@
             height: typeof st.layout.height === 'number' ? Math.max(250, st.layout.height) : 492,
             activeTab: actTab
           };
+        }
+        if (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar') {
+          tmState.activeSubTab = 'trade';
         }
       }
     } catch {}
@@ -360,7 +440,12 @@
         baseStakeAmount,
         nkSession,
         advComp,
-        tmState,
+        tmState: {
+          ...tmState,
+          activeSubTab: (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar') && (!card || !card.classList.contains('fullscreen'))
+            ? 'trade'
+            : tmState.activeSubTab
+        },
         mxState,
         chState: {
           activeMode: chState.activeMode,
@@ -374,6 +459,7 @@
           completedSessions: pxState.completedSessions,
           useLivePayout: pxState.useLivePayout
         },
+        toolsState,
         recentTrades: recentTrades.slice(0, 30),
         audioEnabled,
         signalMode,
@@ -387,7 +473,7 @@
   loadPersistedState();
 
   // DOM refs
-  let root, bubble, card, screenFlashEl, callBtn, putBtn, customStakeInput;
+  let root, bubble, card, screenFlashEl, fixedDockEl, customStakeInput;
   let syncStatusDot, tfLabel, expiryLabel, radarTfBadge, radarCandleTime, radarBigSignal;
   let radarPatternLbl, radarSup, radarRes, radarRsi, radarLivePrice, radarSourceLbl, radarTrendLbl, radarConfList;
   let radarChartCanvas, radarWickBar, radarConfFill, radarAccLbl, signalModeBtns;
@@ -395,8 +481,9 @@
   let miniSignalBar, miniSignalText, miniSignalTimer, miniTakeBtn, miniBiasFill;
   let activeTradeBox, activeTradeText, activeTradeCountdown, audioToggleBtn;
   let balanceVal, accTypeLabel, assetVal, miniBal, syncPill, payoutPctLbl, estProfitLbl, scrapeSourceLbl;
-  let callStakeLbl, putStakeLbl, quickChips, notifyBox, orderLogsList;
+  let quickChips, notifyBox, orderLogsList;
   let tmRootEl, chRootEl, pxRootEl, dockAutoTag;
+  let fwOverlayEl, shareOverlayEl;
   let isDragging = false, isResizing = false;
 
   // =========================================================================
@@ -2222,7 +2309,9 @@
       lastAlertedSignal = realSignal;
       lastAlertedTime = now;
       triggerSignalFlash(realSignal, conf);
-      if (audioEnabled) playAudioAlert();
+      if (audioEnabled && toolsState.soundEnabled) {
+        playAudioAlert(realSignal, conf);
+      }
     }
   }
 
@@ -2443,20 +2532,14 @@
     }
   }
 
-  function playAudioAlert() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.14, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.25);
-    } catch {}
+  function playAudioAlert(sigDir, sigConf) {
+    playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
+    if (toolsState.voiceAnnounceEnabled && (sigDir === 'CALL' || sigDir === 'PUT')) {
+      const msg = toolsState.voiceLanguage === 'Hindi'
+        ? (sigDir === 'CALL' ? `बाय सिग्नल मिला, ${sigConf || ''} प्रतिशत` : `सेल सिग्नल मिला, ${sigConf || ''} प्रतिशत`)
+        : (sigDir === 'CALL' ? `Buy signal detected, ${sigConf || ''} percent` : `Sell signal detected, ${sigConf || ''} percent`);
+      speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume);
+    }
   }
 
   function triggerSignalFlash(dir, conf) {
@@ -2468,13 +2551,16 @@
     const flashText = root.querySelector('#al-flash-text');
     const bubblePill = root.querySelector('#al-bubble-signal-pill');
     const radarHero = root.querySelector('.al-radar-hero');
+    const tmBuy = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-buy') : null;
+    const tmSell = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-sell') : null;
 
     if (signalFlashTimeout) clearTimeout(signalFlashTimeout);
 
     card.classList.remove('flash-call', 'flash-put');
     bubble.classList.remove('flash-call', 'flash-put');
-    if (callBtn) callBtn.classList.remove('al-btn-pulse');
-    if (putBtn) putBtn.classList.remove('al-btn-pulse');
+    if (miniTakeBtn) miniTakeBtn.classList.remove('al-btn-pulse');
+    if (tmBuy) tmBuy.classList.remove('al-btn-pulse');
+    if (tmSell) tmSell.classList.remove('al-btn-pulse');
     if (radarHero) radarHero.classList.remove('flash-call', 'flash-put');
     if (screenFlashEl) screenFlashEl.classList.remove('active-call', 'active-put');
 
@@ -2498,15 +2584,19 @@
     card.classList.add(flashClass);
     bubble.classList.add(flashClass);
     if (radarHero) radarHero.classList.add(flashClass);
-    if (isCall && callBtn) callBtn.classList.add('al-btn-pulse');
-    else if (putBtn) putBtn.classList.add('al-btn-pulse');
+    if (miniTakeBtn) miniTakeBtn.classList.add('al-btn-pulse');
+    if (isCall && tmBuy) tmBuy.classList.add('al-btn-pulse');
+    else if (!isCall && tmSell) tmSell.classList.add('al-btn-pulse');
     if (screenFlashEl) screenFlashEl.classList.add(isCall ? 'active-call' : 'active-put');
 
     signalFlashTimeout = setTimeout(() => {
       card.classList.remove('flash-call', 'flash-put');
       bubble.classList.remove('flash-call', 'flash-put');
-      if (callBtn) callBtn.classList.remove('al-btn-pulse');
-      if (putBtn) putBtn.classList.remove('al-btn-pulse');
+      if (miniTakeBtn) miniTakeBtn.classList.remove('al-btn-pulse');
+      const curBuy = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-buy') : null;
+      const curSell = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-sell') : null;
+      if (curBuy) curBuy.classList.remove('al-btn-pulse');
+      if (curSell) curSell.classList.remove('al-btn-pulse');
       if (radarHero) radarHero.classList.remove('flash-call', 'flash-put');
       if (screenFlashEl) screenFlashEl.classList.remove('active-call', 'active-put');
       if (flashBar) flashBar.style.display = 'none';
@@ -2975,40 +3065,1049 @@
       .replace(/"/g, '&quot;');
   }
 
-  function playTMBeep(kind) {
-    if (!audioEnabled) return;
+  // -------------------------------------------------------------------------
+  // 7.0 WEB AUDIO SYNTHESIZER, 2-WAY VOICE, THEMES, FIREWORKS & P&L SHARE
+  // -------------------------------------------------------------------------
+  let sharedAudioContext = null;
+  let currentSpeechUtterance = null;
+  let audioVisTimeout = null;
+
+  function getSharedAudioContext() {
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+        sharedAudioContext = new AudioCtx();
+      }
+      if (sharedAudioContext.state === 'suspended') {
+        sharedAudioContext.resume().catch(() => {});
+      }
+      return sharedAudioContext;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const unlockAudioCtx = () => {
+      try {
+        const ctx = getSharedAudioContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('pointerdown', unlockAudioCtx, { passive: true });
+    window.addEventListener('touchstart', unlockAudioCtx, { passive: true });
+    window.addEventListener('keydown', unlockAudioCtx, { passive: true });
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
+  } catch {}
+
+  const AUDIO_NOTES = {
+    C3: 130.81, E3: 164.81, G3: 196.00, A3: 220.00, B3: 246.94,
+    C4: 261.63, D4: 293.66, Eb4: 311.13, E4: 329.63, F4: 349.23,
+    G4: 392.00, A4: 440.00, Bb4: 466.16, B4: 493.88,
+    C5: 523.25, D5: 587.33, Eb5: 622.25, E5: 659.25, F5: 698.46,
+    Fs5: 739.99, G5: 783.99, A5: 880.00, B5: 987.77,
+    C6: 1046.50, D6: 1174.66, E6: 1318.51, G6: 1567.98, C7: 2093.00
+  };
+
+  const SOUND_PACKS = [
+    { id: 'sniper', name: 'Sniper Tactical', badge: 'Pro Default', desc: 'High-precision cyber chimes & crisp radar pulses', palette: ['#0c1017', '#f59e0b', '#10b981'], border: '#f59e0b', text: '#fbbf24' },
+    { id: 'arcade', name: '8-Bit Arcade', badge: 'Retro', desc: 'Chiptune arpeggios, coin cascades & game fanfare', palette: ['#0a081a', '#06b6d4', '#ec4899'], border: '#22d3ee', text: '#22d3ee' },
+    { id: 'zen', name: 'Zen Harmonic', badge: 'Luxury', desc: 'Warm Rhodes chords & calm singing bowl chimes', palette: ['#051410', '#10b981', '#f59e0b'], border: '#10b981', text: '#34d399' },
+    { id: 'cyberpunk', name: 'Neon Cyberpunk', badge: 'Synthwave', desc: 'Detuned analog saw stabs & filter sweeps', palette: ['#080514', '#f43f5e', '#00f0ff'], border: '#d946ef', text: '#e879f9' }
+  ];
+
+  const THEME_OPTIONS = [
+    { id: 'sniper', name: 'Sniper Dark', desc: 'High-contrast obsidian tactical terminal', palette: ['#0b0f19', '#f59e0b', '#10b981'] },
+    { id: 'arcade', name: 'Arcade Retro', desc: 'Electric cyan & pixel contrast accents', palette: ['#0a081a', '#06b6d4', '#ec4899'] },
+    { id: 'zen', name: 'Zen Emerald', desc: 'Deep jade focus palette for calm sessions', palette: ['#051410', '#10b981', '#fbbf24'] },
+    { id: 'cyberpunk', name: 'Cyber Neon', desc: 'Synthetic violet & neon magenta glow', palette: ['#0d061c', '#d946ef', '#22d3ee'] },
+    { id: 'light', name: 'Daylight Pro', desc: 'Clean high-visibility slate mode', palette: ['#1e293b', '#0284c7', '#f59e0b'] },
+    { id: 'gold', name: '24K Sovereign', desc: 'Royal bullion gold & dark bronze trim', palette: ['#131008', '#fbbf24', '#34d399'] }
+  ];
+
+  const CELEBRATION_THEME_CONFIG = {
+    golden_royal: {
+      id: 'golden_royal', label: 'Royal Gold', icon: '👑',
+      bg: 'linear-gradient(180deg, #131008 0%, #0c0a06 55%, #050402 100%)',
+      border: 'rgba(245, 158, 11, 0.45)', accent: '#fbbf24',
+      badge: 'DISCIPLINED PLAN EXECUTED', title: 'TARGET ACHIEVED',
+      tagline: 'Trading plan target achieved with disciplined execution & risk control.',
+      soundTone: 'sniper', btnBg: 'linear-gradient(90deg, #f59e0b, #d97706)', btnCol: '#000',
+      palettes: [['#f59e0b', '#fbbf24', '#fef08a', '#ffffff'], ['#10b981', '#34d399', '#6ee7b7', '#fef08a']]
+    },
+    rockets: {
+      id: 'rockets', label: 'Cosmic Rockets', icon: '🚀',
+      bg: 'linear-gradient(180deg, #091122 0%, #060b17 55%, #020409 100%)',
+      border: 'rgba(6, 182, 212, 0.45)', accent: '#22d3ee',
+      badge: 'PROFIT TARGET LOCKED', title: 'PROFIT GOAL LOCKED',
+      tagline: 'Precision trajectory confirmed. Profit goal secured safely.',
+      soundTone: 'cyberpunk', btnBg: 'linear-gradient(90deg, #06b6d4, #2563eb)', btnCol: '#fff',
+      palettes: [['#06b6d4', '#38bdf8', '#f97316', '#ffffff'], ['#38bdf8', '#818cf8', '#c084fc', '#ffffff']]
+    },
+    dolls: {
+      id: 'dolls', label: 'Festive Dolls', icon: '🎎',
+      bg: 'linear-gradient(180deg, #180916 0%, #0f050e 55%, #070207 100%)',
+      border: 'rgba(236, 72, 153, 0.45)', accent: '#f472b6',
+      badge: 'GOAL COMPLETED', title: 'SESSION GOAL REACHED',
+      tagline: 'Strategic patience and steady compounding yielded target profit.',
+      soundTone: 'zen', btnBg: 'linear-gradient(90deg, #ec4899, #e11d48)', btnCol: '#fff',
+      palettes: [['#ec4899', '#f43f5e', '#fb7185', '#fef08a'], ['#10b981', '#34d399', '#a78bfa', '#ffffff']]
+    },
+    arcade: {
+      id: 'arcade', label: '8-Bit Arcade', icon: '👾',
+      bg: 'linear-gradient(180deg, #0f0920 0%, #080514 55%, #040209 100%)',
+      border: 'rgba(168, 85, 247, 0.45)', accent: '#34d399',
+      badge: 'STAGE CLEARED', title: 'STAGE CLEARED',
+      tagline: 'Strict risk control parameters maintained across all trade steps.',
+      soundTone: 'arcade', btnBg: 'linear-gradient(90deg, #a855f7, #06b6d4)', btnCol: '#fff',
+      palettes: [['#06b6d4', '#22d3ee', '#ec4899', '#facc15'], ['#a855f7', '#d946ef', '#facc15', '#ffffff']]
+    }
+  };
+  const CELEBRATION_VARIANT_CYCLE = ['golden_royal', 'rockets', 'dolls', 'arcade'];
+
+  function createAudioMasterChain(ctx, volume) {
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(volume <= 0.005 ? 0 : Math.max(0.01, Math.min(1, volume)), ctx.currentTime);
+    if (typeof ctx.createDynamicsCompressor === 'function') {
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-18, ctx.currentTime);
+      compressor.knee.setValueAtTime(12, ctx.currentTime);
+      compressor.ratio.setValueAtTime(8, ctx.currentTime);
+      compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+      compressor.release.setValueAtTime(0.2, ctx.currentTime);
+      masterGain.connect(compressor);
+      compressor.connect(ctx.destination);
+    } else {
+      masterGain.connect(ctx.destination);
+    }
+    return masterGain;
+  }
+
+  function isAudioCategoryEnabled(ev) {
+    const cats = toolsState.soundCategories || {};
+    if (ev === 'win' || ev === 'streak') return cats.wins !== false;
+    if (ev === 'loss') return cats.losses !== false;
+    if (ev === 'signal') return cats.signals !== false;
+    if (ev === 'target' || ev === 'stage') return cats.milestones !== false;
+    if (ev === 'countdown') return cats.countdown !== false;
+    if (ev === 'click' || ev === 'copy') return cats.clicks !== false;
+    return true;
+  }
+
+  function notifyAudioVisualizer(ev, style) {
+    toolsUIState.isAudioPlaying = true;
+    toolsUIState.activeAudioEvent = `${String(ev).toUpperCase()} (${String(style || 'sniper').toUpperCase()})`;
+    if (audioVisTimeout) clearTimeout(audioVisTimeout);
+    if (tmRootEl && tmState.activeSubTab === 'tools') {
+      const visLbl = tmRootEl.querySelector('#al-tools-vis-lbl');
+      const visBars = tmRootEl.querySelector('#al-tools-vis-bars');
+      if (visLbl) visLbl.textContent = toolsUIState.activeAudioEvent;
+      if (visBars) visBars.classList.add('playing');
+    }
+    audioVisTimeout = setTimeout(() => {
+      toolsUIState.isAudioPlaying = false;
+      toolsUIState.activeAudioEvent = '';
+      if (tmRootEl && tmState.activeSubTab === 'tools') {
+        const visLbl = tmRootEl.querySelector('#al-tools-vis-lbl');
+        const visBars = tmRootEl.querySelector('#al-tools-vis-bars');
+        if (visLbl) visLbl.textContent = 'READY';
+        if (visBars) visBars.classList.remove('playing');
+      }
+    }, 950);
+  }
+
+  function playFirecrackerAudio(volume = toolsState.soundVolume, style = toolsState.toneStyle) {
+    if (!audioEnabled || !toolsState.soundEnabled || volume <= 0.005) return;
+    try {
+      const ctx = getSharedAudioContext();
+      if (!ctx) return;
+      const master = createAudioMasterChain(ctx, volume);
       const now = ctx.currentTime;
-      const tone = (freq, startOff, dur, gainVal = 0.12, type = 'sine') => {
+
+      const riseOsc = ctx.createOscillator();
+      const riseGain = ctx.createGain();
+      riseOsc.type = style === 'arcade' ? 'triangle' : 'sine';
+      riseOsc.frequency.setValueAtTime(220, now);
+      riseOsc.frequency.exponentialRampToValueAtTime(560, now + 0.28);
+      riseGain.gain.setValueAtTime(0.04, now);
+      riseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      riseOsc.connect(riseGain);
+      riseGain.connect(master);
+      riseOsc.start(now);
+      riseOsc.stop(now + 0.3);
+
+      const boomTime = now + 0.26;
+      const subOsc = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      const subFilter = ctx.createBiquadFilter();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(115, boomTime);
+      subOsc.frequency.exponentialRampToValueAtTime(38, boomTime + 0.45);
+      subFilter.type = 'lowpass';
+      subFilter.frequency.setValueAtTime(180, boomTime);
+      subGain.gain.setValueAtTime(0.18, boomTime);
+      subGain.gain.exponentialRampToValueAtTime(0.001, boomTime + 0.45);
+      subOsc.connect(subFilter);
+      subFilter.connect(subGain);
+      subGain.connect(master);
+      subOsc.start(boomTime);
+      subOsc.stop(boomTime + 0.46);
+
+      [523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51].forEach((freq, idx) => {
+        const noteTime = boomTime + 0.04 + idx * 0.055;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = style === 'arcade' ? 'square' : 'sine';
+        osc.frequency.setValueAtTime(freq, noteTime);
+        gain.gain.setValueAtTime(0.09, noteTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.65);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(noteTime);
+        osc.stop(noteTime + 0.68);
+      });
+      notifyAudioVisualizer('firecracker', style);
+    } catch {}
+  }
+
+  function playSoundEffect(event, volume = toolsState.soundVolume, style = toolsState.toneStyle) {
+    if (!audioEnabled || !toolsState.soundEnabled) return;
+    if (volume <= 0.005) return;
+    if (!isAudioCategoryEnabled(event)) return;
+    if (event === 'firecracker') {
+      playFirecrackerAudio(volume, style);
+      return;
+    }
+    try {
+      const ctx = getSharedAudioContext();
+      if (!ctx) return;
+      const master = createAudioMasterChain(ctx, volume);
+      const t = ctx.currentTime;
+      const st = (style === 'arcade' || style === 'zen' || style === 'cyberpunk') ? style : 'sniper';
+
+      if (event === 'click') {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, now + startOff);
-        g.gain.setValueAtTime(gainVal, now + startOff);
-        g.gain.exponentialRampToValueAtTime(0.005, now + startOff + dur);
-        osc.connect(g);
-        g.connect(ctx.destination);
-        osc.start(now + startOff);
-        osc.stop(now + startOff + dur);
-      };
-      if (kind === 'win') {
-        tone(660, 0, 0.12, 0.13);
-        tone(880, 0.09, 0.18, 0.14);
-      } else if (kind === 'loss') {
-        tone(310, 0, 0.18, 0.12, 'triangle');
-        tone(210, 0.12, 0.22, 0.12, 'triangle');
-      } else if (kind === 'target') {
-        tone(523.25, 0, 0.12, 0.13);
-        tone(659.25, 0.09, 0.12, 0.13);
-        tone(783.99, 0.18, 0.14, 0.14);
-        tone(1046.5, 0.27, 0.26, 0.16);
-      } else {
-        tone(720, 0, 0.06, 0.07);
+        if (st === 'arcade') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(950, t);
+          osc.frequency.exponentialRampToValueAtTime(450, t + 0.04);
+          g.gain.setValueAtTime(0.06, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+          osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.04);
+        } else if (st === 'zen') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(360, t);
+          g.gain.setValueAtTime(0.07, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+          osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.06);
+        } else if (st === 'cyberpunk') {
+          osc.type = 'sawtooth';
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(2400, t);
+          filter.frequency.exponentialRampToValueAtTime(300, t + 0.05);
+          osc.frequency.setValueAtTime(280, t);
+          g.gain.setValueAtTime(0.08, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+          osc.connect(filter); filter.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.05);
+        } else {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1200, t);
+          osc.frequency.exponentialRampToValueAtTime(400, t + 0.035);
+          g.gain.setValueAtTime(0.06, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+          osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.035);
+        }
+      } else if (event === 'copy') {
+        const osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator(), g = ctx.createGain();
+        const base = st === 'arcade' ? 659.25 : st === 'zen' ? 440 : 587.33;
+        osc1.type = st === 'arcade' ? 'square' : 'triangle';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(base, t); osc1.frequency.setValueAtTime(base * 1.5, t + 0.05);
+        osc2.frequency.setValueAtTime(base * 2, t); osc2.frequency.setValueAtTime(base * 3, t + 0.05);
+        g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc1.connect(g); osc2.connect(g); g.connect(master);
+        osc1.start(t); osc2.start(t); osc1.stop(t + 0.12); osc2.stop(t + 0.12);
+      } else if (event === 'win') {
+        if (st === 'arcade') {
+          [AUDIO_NOTES.C5, AUDIO_NOTES.E5, AUDIO_NOTES.G5, AUDIO_NOTES.C6, AUDIO_NOTES.E6, AUDIO_NOTES.G6].forEach((freq, i) => {
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.type = 'square'; osc.frequency.setValueAtTime(freq, t + i * 0.06);
+            g.gain.setValueAtTime(0.08, t + i * 0.06); g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.14);
+            osc.connect(g); g.connect(master); osc.start(t + i * 0.06); osc.stop(t + i * 0.06 + 0.15);
+          });
+        } else if (st === 'zen') {
+          [
+            { f: AUDIO_NOTES.C4, d: 0, dur: 0.8 }, { f: AUDIO_NOTES.G4, d: 0.08, dur: 0.9 },
+            { f: AUDIO_NOTES.C5, d: 0.16, dur: 1.0 }, { f: AUDIO_NOTES.E5, d: 0.24, dur: 1.1 }, { f: AUDIO_NOTES.B5, d: 0.32, dur: 1.25 }
+          ].forEach(({ f, d, dur }) => {
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(f, t + d);
+            g.gain.setValueAtTime(0.001, t + d); g.gain.linearRampToValueAtTime(0.08, t + d + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + d + dur);
+            osc.connect(g); g.connect(master); osc.start(t + d); osc.stop(t + d + dur);
+          });
+        } else if (st === 'cyberpunk') {
+          [AUDIO_NOTES.C4, AUDIO_NOTES.G4, AUDIO_NOTES.C5, AUDIO_NOTES.Eb5, AUDIO_NOTES.G5].forEach((freq, idx) => {
+            const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
+            o1.type = 'sawtooth'; o2.type = 'sawtooth';
+            o1.frequency.setValueAtTime(freq, t + idx * 0.04); o2.frequency.setValueAtTime(freq * 1.008, t + idx * 0.04);
+            flt.type = 'lowpass'; flt.frequency.setValueAtTime(3200, t + idx * 0.04); flt.frequency.exponentialRampToValueAtTime(800, t + idx * 0.04 + 0.55);
+            g.gain.setValueAtTime(0.001, t + idx * 0.04); g.gain.linearRampToValueAtTime(0.06, t + idx * 0.04 + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.04 + 0.55);
+            o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(master);
+            o1.start(t + idx * 0.04); o2.start(t + idx * 0.04); o1.stop(t + idx * 0.04 + 0.6); o2.stop(t + idx * 0.04 + 0.6);
+          });
+        } else {
+          [{ f: AUDIO_NOTES.C5, d: 0 }, { f: AUDIO_NOTES.E5, d: 0.07 }, { f: AUDIO_NOTES.G5, d: 0.14 }, { f: AUDIO_NOTES.B5, d: 0.21 }, { f: AUDIO_NOTES.C6, d: 0.28 }].forEach(({ f, d }, idx, arr) => {
+            const osc = ctx.createOscillator(), g = ctx.createGain(), hold = idx === arr.length - 1 ? 0.55 : 0.24;
+            osc.type = idx === arr.length - 1 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(f, t + d);
+            g.gain.setValueAtTime(0.09, t + d); g.gain.exponentialRampToValueAtTime(0.001, t + d + hold);
+            osc.connect(g); g.connect(master); osc.start(t + d); osc.stop(t + d + hold);
+          });
+        }
+      } else if (event === 'loss') {
+        if (st === 'arcade') {
+          [AUDIO_NOTES.Eb4, AUDIO_NOTES.D4, AUDIO_NOTES.C4].forEach((freq, idx) => {
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.type = 'square'; osc.frequency.setValueAtTime(freq, t + idx * 0.09);
+            g.gain.setValueAtTime(0.06, t + idx * 0.09); g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.09 + 0.18);
+            osc.connect(g); g.connect(master); osc.start(t + idx * 0.09); osc.stop(t + idx * 0.09 + 0.19);
+          });
+        } else if (st === 'zen') {
+          const osc = ctx.createOscillator(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
+          osc.type = 'sine'; osc.frequency.setValueAtTime(220, t); osc.frequency.exponentialRampToValueAtTime(165, t + 0.7);
+          flt.type = 'lowpass'; flt.frequency.setValueAtTime(450, t);
+          g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+          osc.connect(flt); flt.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.75);
+        } else {
+          [{ f: AUDIO_NOTES.F4, d: 0, dur: 0.35 }, { f: AUDIO_NOTES.C4, d: 0.12, dur: 0.5 }].forEach(({ f, d, dur }) => {
+            const osc = ctx.createOscillator(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
+            osc.type = st === 'cyberpunk' ? 'sawtooth' : 'triangle'; osc.frequency.setValueAtTime(f, t + d);
+            flt.type = 'lowpass'; flt.frequency.setValueAtTime(900, t);
+            g.gain.setValueAtTime(0.001, t + d); g.gain.linearRampToValueAtTime(0.07, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + d + dur);
+            osc.connect(flt); flt.connect(g); g.connect(master); osc.start(t + d); osc.stop(t + d + dur);
+          });
+        }
+      } else if (event === 'streak') {
+        [AUDIO_NOTES.C5, AUDIO_NOTES.E5, AUDIO_NOTES.G5, AUDIO_NOTES.A5, AUDIO_NOTES.C6, AUDIO_NOTES.E6, AUDIO_NOTES.G6].forEach((freq, idx, arr) => {
+          const osc = ctx.createOscillator(), g = ctx.createGain();
+          const dur = idx === arr.length - 1 ? 0.65 : 0.18;
+          osc.type = st === 'arcade' ? 'square' : st === 'zen' ? 'sine' : st === 'cyberpunk' ? 'sawtooth' : 'triangle';
+          osc.frequency.setValueAtTime(freq, t + idx * 0.05);
+          g.gain.setValueAtTime(0.001, t + idx * 0.05); g.gain.linearRampToValueAtTime(idx === arr.length - 1 ? 0.1 : 0.07, t + idx * 0.05 + 0.015);
+          g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.05 + dur);
+          osc.connect(g); g.connect(master); osc.start(t + idx * 0.05); osc.stop(t + idx * 0.05 + dur);
+        });
+      } else if (event === 'target') {
+        const herald = [
+          { f: AUDIO_NOTES.C4, d: 0.0, dur: 0.12 }, { f: AUDIO_NOTES.C4, d: 0.12, dur: 0.12 },
+          { f: AUDIO_NOTES.C4, d: 0.24, dur: 0.12 }, { f: AUDIO_NOTES.G4, d: 0.36, dur: 0.28 },
+          { f: AUDIO_NOTES.C5, d: 0.65, dur: 0.4 }, { f: AUDIO_NOTES.E5, d: 0.95, dur: 0.3 }, { f: AUDIO_NOTES.G5, d: 1.25, dur: 0.75 }
+        ];
+        herald.forEach(({ f, d, dur }) => {
+          const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+          o1.type = st === 'arcade' ? 'square' : st === 'zen' ? 'sine' : 'triangle'; o2.type = 'sawtooth';
+          o1.frequency.setValueAtTime(f, t + d); o2.frequency.setValueAtTime(f * 2, t + d);
+          g.gain.setValueAtTime(0.001, t + d); g.gain.linearRampToValueAtTime(0.08, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + d + dur);
+          o1.connect(g); o2.connect(g); g.connect(master);
+          o1.start(t + d); o2.start(t + d); o1.stop(t + d + dur); o2.stop(t + d + dur);
+        });
+      } else if (event === 'signal') {
+        if (st === 'arcade') {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'square'; o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(1400, t + 0.1);
+          g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+          o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.22);
+        } else if (st === 'zen') {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(1046.5, t); o.frequency.exponentialRampToValueAtTime(1567.98, t + 0.06);
+          g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+          o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.46);
+        } else {
+          const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+          o1.type = st === 'cyberpunk' ? 'sawtooth' : 'sine';
+          o1.frequency.setValueAtTime(880, t); o1.frequency.exponentialRampToValueAtTime(1320, t + 0.08);
+          g1.gain.setValueAtTime(0.08, t); g1.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+          o1.connect(g1); g1.connect(master); o1.start(t); o1.stop(t + 0.13);
+          const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+          o2.type = 'triangle'; o2.frequency.setValueAtTime(AUDIO_NOTES.B5, t + 0.11);
+          g2.gain.setValueAtTime(0.09, t + 0.11); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+          o2.connect(g2); g2.connect(master); o2.start(t + 0.11); o2.stop(t + 0.52);
+        }
+      } else if (event === 'stage') {
+        [AUDIO_NOTES.C5, AUDIO_NOTES.F5, AUDIO_NOTES.A5, AUDIO_NOTES.C6].forEach((freq, idx) => {
+          const o = ctx.createOscillator(), g = ctx.createGain(), dur = idx === 3 ? 0.5 : 0.2;
+          o.type = st === 'arcade' ? 'square' : st === 'zen' ? 'sine' : st === 'cyberpunk' ? 'sawtooth' : 'triangle';
+          o.frequency.setValueAtTime(freq, t + idx * 0.07);
+          g.gain.setValueAtTime(0.08, t + idx * 0.07); g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.07 + dur);
+          o.connect(g); g.connect(master); o.start(t + idx * 0.07); o.stop(t + idx * 0.07 + dur);
+        });
+      } else if (event === 'countdown') {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = st === 'arcade' ? 'square' : st === 'zen' ? 'triangle' : 'sine';
+        o.frequency.setValueAtTime(st === 'zen' ? 700 : st === 'arcade' ? 1200 : 1500, t);
+        o.frequency.exponentialRampToValueAtTime(400, t + 0.025);
+        g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+        o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.03);
       }
+      notifyAudioVisualizer(event, st);
     } catch {}
+  }
+
+  function speakVoiceNotification(text, language = toolsState.voiceLanguage, volume = toolsState.soundVolume) {
+    try {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      if (!audioEnabled || !toolsState.soundEnabled || volume <= 0.005) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.volume = Math.max(0.1, Math.min(1, volume));
+      utterance.rate = 1.0;
+      utterance.pitch = 1.05;
+      const voices = window.speechSynthesis.getVoices() || [];
+      if (language === 'Hindi') {
+        utterance.lang = 'hi-IN';
+        const hiVoice = voices.find(v => v.lang && (v.lang.startsWith('hi') || v.lang.includes('HI')));
+        if (hiVoice) utterance.voice = hiVoice;
+      } else {
+        utterance.lang = 'en-US';
+        const enVoice = voices.find(v => v.lang && (v.lang === 'en-US' || v.lang.startsWith('en')));
+        if (enVoice) utterance.voice = enVoice;
+      }
+      currentSpeechUtterance = utterance;
+      utterance.onend = () => { currentSpeechUtterance = null; };
+      utterance.onerror = () => { currentSpeechUtterance = null; };
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    } catch {}
+  }
+
+  function playTMBeep(kind) {
+    playSoundEffect(kind || 'click', toolsState.soundVolume, toolsState.toneStyle);
+  }
+
+  function applyGenieTheme(themeId) {
+    if (!card) return;
+    const valid = ['dark', 'sniper', 'arcade', 'zen', 'cyberpunk', 'light', 'gold'];
+    const t = valid.includes(themeId) ? themeId : 'dark';
+    toolsState.currentTheme = t;
+    card.setAttribute('data-al-theme', t === 'sniper' ? 'dark' : t);
+  }
+
+  // Fireworks Overlay Engine
+  let fwCanvasCtrl = { explode: null, salvo: null };
+
+  function closeFireworksOverlay() {
+    fwState.open = false;
+    if (fwState.animId) {
+      cancelAnimationFrame(fwState.animId);
+      fwState.animId = null;
+    }
+    if (fwOverlayEl) {
+      fwOverlayEl.remove();
+      fwOverlayEl = null;
+    }
+  }
+
+  function startFireworksCanvas(canvas) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+    let width = canvas.width = Math.max(320, window.innerWidth);
+    let height = canvas.height = Math.max(320, window.innerHeight);
+    const particles = [];
+    const rockets = [];
+
+    const getPalettes = () => (CELEBRATION_THEME_CONFIG[fwState.variant] || CELEBRATION_THEME_CONFIG.golden_royal).palettes;
+
+    const explodeFirework = (tx, ty, palette) => {
+      const pals = getPalettes();
+      const chosen = palette || pals[Math.floor(Math.random() * pals.length)];
+      const count = 68;
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + (Math.random() * 0.2 - 0.1);
+        const speed = Math.random() * 5.2 + 1.8;
+        particles.push({
+          x: tx, y: ty, prevX: tx, prevY: ty,
+          vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+          alpha: 1, decay: Math.random() * 0.016 + 0.013,
+          color: chosen[Math.floor(Math.random() * chosen.length)],
+          size: Math.random() * 2.2 + 1.4,
+          shape: fwState.variant === 'arcade' ? 'square' : 'circle'
+        });
+      }
+    };
+
+    const launchRocket = (sx, ty) => {
+      const pals = getPalettes();
+      const chosen = pals[Math.floor(Math.random() * pals.length)];
+      rockets.push({ x: sx, y: height + 10, targetY: ty, vy: -(Math.random() * 3 + 11), color: chosen[0], palette: chosen });
+    };
+
+    fwCanvasCtrl.explode = explodeFirework;
+    fwCanvasCtrl.salvo = () => {
+      for (let k = 0; k < 4; k++) {
+        setTimeout(() => {
+          if (!fwState.open) return;
+          launchRocket(width * (0.2 + Math.random() * 0.6), height * (0.18 + Math.random() * 0.28));
+        }, k * 170);
+      }
+    };
+
+    setTimeout(() => {
+      if (!fwState.open) return;
+      explodeFirework(width * 0.26, height * 0.30);
+      explodeFirework(width * 0.74, height * 0.32);
+      launchRocket(width * 0.5, height * 0.24);
+    }, 80);
+
+    let lastAuto = Date.now();
+    const tick = () => {
+      if (!fwState.open || !fwOverlayEl) return;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.19)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = rockets.length - 1; i >= 0; i--) {
+        const r = rockets[i];
+        r.y += r.vy;
+        r.vy *= 0.99;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        if (r.y <= r.targetY || r.vy > -1.5) {
+          explodeFirework(r.x, r.y, r.palette);
+          rockets.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.prevX = p.x; p.prevY = p.y;
+        p.vx *= 0.96; p.vy *= 0.96; p.vy += 0.055;
+        p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+        if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.strokeStyle = p.color;
+        ctx.fillStyle = p.color;
+        ctx.lineWidth = p.size;
+        if (p.shape === 'square') {
+          ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2.1, p.size * 2.1);
+        } else {
+          ctx.beginPath(); ctx.moveTo(p.prevX, p.prevY); ctx.lineTo(p.x, p.y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      const now = Date.now();
+      if (now - lastAuto > 950) {
+        lastAuto = now;
+        if (particles.length < 220) {
+          if (Math.random() > 0.4) launchRocket(width * (0.15 + Math.random() * 0.7), height * (0.18 + Math.random() * 0.3));
+          else explodeFirework(width * (0.2 + Math.random() * 0.6), height * (0.2 + Math.random() * 0.3));
+        }
+      }
+      fwState.animId = requestAnimationFrame(tick);
+    };
+    fwState.animId = requestAnimationFrame(tick);
+  }
+
+  function renderFireworksOverlay() {
+    if (!fwState.open) { closeFireworksOverlay(); return; }
+    if (!fwOverlayEl) {
+      fwOverlayEl = document.createElement('div');
+      fwOverlayEl.id = 'al-fireworks-overlay';
+      document.body.appendChild(fwOverlayEl);
+    }
+    const cfg = CELEBRATION_THEME_CONFIG[fwState.variant] || CELEBRATION_THEME_CONFIG.golden_royal;
+    fwOverlayEl.innerHTML = `
+      <canvas id="al-fw-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></canvas>
+      <div class="al-fw-card" style="background:${cfg.bg};border:1px solid ${cfg.border};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            ${CELEBRATION_VARIANT_CYCLE.map(vid => {
+              const vc = CELEBRATION_THEME_CONFIG[vid];
+              const act = fwState.variant === vid;
+              return `<button data-fw-theme="${vid}" style="padding:3px 7px;border-radius:4px;font-size:9px;font-weight:800;cursor:pointer;border:1px solid ${act ? cfg.border : 'rgba(255,255,255,0.12)'};background:${act ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.45)'};color:${act ? '#fff' : '#94a3b8'};">${vc.icon} ${vc.label}</button>`;
+            }).join('')}
+          </div>
+          <button data-fw-act="close" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#cbd5e1;width:24px;height:24px;border-radius:5px;cursor:pointer;font-weight:900;">✕</button>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid ${cfg.border};font-size:9px;font-weight:900;letter-spacing:1px;color:${cfg.accent};margin-bottom:6px;">
+          <span>${cfg.icon}</span><span>${cfg.badge}</span>
+        </div>
+        <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:0.6px;margin-bottom:4px;">${escHtml(fwState.title || cfg.title)}</div>
+        <p style="font-size:10.5px;color:#94a3b8;margin:0 0 10px 0;">${cfg.tagline}</p>
+        <div style="background:rgba(0,0,0,0.48);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:10px;margin-bottom:10px;">
+          <span style="font-size:8.5px;font-weight:900;color:#94a3b8;letter-spacing:1px;display:block;">SESSION NET PROFIT</span>
+          <div style="font-size:30px;font-weight:900;font-family:monospace;color:${cfg.accent};">+$${Math.max(0, Number(fwState.winProfit) || 0).toFixed(2)}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;font-family:monospace;">
+          <div style="background:rgba(0,0,0,0.38);padding:6px;border-radius:5px;border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:8px;color:#64748b;display:block;">BALANCE</span>
+            <strong style="font-size:11.5px;color:#fff;">$${Number(fwState.currentBalance || tmState.currentBalance).toFixed(2)}</strong>
+          </div>
+          <div style="background:rgba(0,0,0,0.38);padding:6px;border-radius:5px;border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:8px;color:#64748b;display:block;">WON / LOST</span>
+            <strong style="font-size:11.5px;color:#34d399;">${fwState.winsCount}W / ${fwState.lossesCount}L</strong>
+          </div>
+          <div style="background:rgba(0,0,0,0.38);padding:6px;border-radius:5px;border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:8px;color:#64748b;display:block;">WIN RATE</span>
+            <strong style="font-size:11.5px;color:#38bdf8;">${fwState.winRate}%</strong>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+          <button data-fw-act="salvo" style="padding:9px;border-radius:5px;border:none;background:${cfg.btnBg};color:${cfg.btnCol};font-size:11px;font-weight:900;cursor:pointer;">💥 ${cfg.label} FX (${fwState.salvoCount})</button>
+          <button data-fw-act="claim" style="padding:9px;border-radius:5px;border:1px solid rgba(16,185,129,0.5);background:rgba(16,185,129,0.18);color:#6ee7b7;font-size:11px;font-weight:900;cursor:pointer;">✓ Claim Profit</button>
+        </div>
+      </div>
+    `;
+
+    const canvas = fwOverlayEl.querySelector('#al-fw-canvas');
+    if (fwState.animId) cancelAnimationFrame(fwState.animId);
+    startFireworksCanvas(canvas);
+
+    fwOverlayEl.onclick = (e) => {
+      const thBtn = e.target.closest('[data-fw-theme]');
+      if (thBtn) {
+        const vid = thBtn.getAttribute('data-fw-theme');
+        fwState.variant = vid;
+        toolsState.fireworksVariant = vid;
+        savePersistedState();
+        playFirecrackerAudio(toolsState.soundVolume, CELEBRATION_THEME_CONFIG[vid].soundTone);
+        renderFireworksOverlay();
+        return;
+      }
+      const actEl = e.target.closest('[data-fw-act]');
+      if (actEl) {
+        const act = actEl.getAttribute('data-fw-act');
+        if (act === 'salvo') {
+          fwState.salvoCount += 1;
+          playFirecrackerAudio(toolsState.soundVolume, cfg.soundTone);
+          if (fwCanvasCtrl.salvo) fwCanvasCtrl.salvo();
+          const btn = fwOverlayEl.querySelector('[data-fw-act="salvo"]');
+          if (btn) btn.textContent = `💥 ${cfg.label} FX (${fwState.salvoCount})`;
+        } else if (act === 'close' || act === 'claim') {
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          closeFireworksOverlay();
+        }
+      }
+    };
+  }
+
+  function openFireworksOverlay(opts = {}) {
+    fwState.variant = opts.variant || toolsState.fireworksVariant || 'golden_royal';
+    fwState.title = opts.title || 'TARGET ACHIEVED';
+    fwState.winProfit = Number(opts.winProfit) || 0;
+    fwState.winRate = opts.winRate != null ? opts.winRate : 100;
+    fwState.currentBalance = opts.currentBalance != null ? opts.currentBalance : tmState.currentBalance;
+    fwState.startBalance = opts.startBalance != null ? opts.startBalance : tmState.sessionStartBalance;
+    fwState.winsCount = opts.winsCount != null ? opts.winsCount : tmState.sessionTrades.filter(t => t.result === 'WIN').length;
+    fwState.lossesCount = opts.lossesCount != null ? opts.lossesCount : tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
+    fwState.assetName = opts.assetName || poAsset || tmState.selectedAsset;
+    fwState.salvoCount = 1;
+    fwState.open = true;
+    const cfg = CELEBRATION_THEME_CONFIG[fwState.variant] || CELEBRATION_THEME_CONFIG.golden_royal;
+    playFirecrackerAudio(toolsState.soundVolume, cfg.soundTone);
+    if (toolsState.voiceAnnounceEnabled) {
+      const msg = toolsState.voiceLanguage === 'Hindi'
+        ? 'टारगेट पूरा हुआ! बहुत-बहुत बधाई, आपने अपना प्रॉफिट लक्ष्य हासिल कर लिया है!'
+        : `Target Achieved! Congratulations, profit goal secured! Plus ${fwState.winProfit.toFixed(2)} dollars.`;
+      setTimeout(() => { if (fwState.open) speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume); }, 350);
+    }
+    renderFireworksOverlay();
+  }
+
+  // HD P&L Share Card Generator & Modal (Fullscreen Only Guarded)
+  const PNL_SHARE_THEMES = {
+    rocket: { id: 'rocket', name: '🚀 Galaxy Rocket', borderOuter: '#8b5cf6', borderInner: 'rgba(6, 182, 212, 0.45)', accent: '#06b6d4', glow: 'rgba(139, 92, 246, 0.5)', bgStops: ['#09061d', '#111638', '#040814'], orbColor: 'rgba(139, 92, 246, 0.35)' },
+    bitcoin: { id: 'bitcoin', name: '₿ Bitcoin Bull', borderOuter: '#f59e0b', borderInner: 'rgba(16, 185, 129, 0.45)', accent: '#10b981', glow: 'rgba(245, 158, 11, 0.5)', bgStops: ['#140d04', '#181408', '#05080b'], orbColor: 'rgba(245, 158, 11, 0.32)' },
+    gold: { id: 'gold', name: '👑 24K Pure Gold', borderOuter: '#fbbf24', borderInner: 'rgba(245, 158, 11, 0.45)', accent: '#fbbf24', glow: 'rgba(251, 191, 36, 0.55)', bgStops: ['#161105', '#1d1607', '#080602'], orbColor: 'rgba(251, 191, 36, 0.36)' },
+    celebration: { id: 'celebration', name: '🎉 Victory Win', borderOuter: '#34d399', borderInner: 'rgba(251, 191, 36, 0.45)', accent: '#34d399', glow: 'rgba(52, 211, 153, 0.5)', bgStops: ['#051812', '#0a221a', '#020b08'], orbColor: 'rgba(16, 185, 129, 0.35)' },
+    sky: { id: 'sky', name: '🌅 Celestial Sky', borderOuter: '#38bdf8', borderInner: 'rgba(251, 191, 36, 0.45)', accent: '#38bdf8', glow: 'rgba(56, 189, 248, 0.5)', bgStops: ['#071426', '#0e223d', '#040a14'], orbColor: 'rgba(56, 189, 248, 0.35)' },
+    cyber: { id: 'cyber', name: '⚡ Cyber Neon', borderOuter: '#10b981', borderInner: 'rgba(16, 185, 129, 0.4)', accent: '#10b981', glow: 'rgba(16, 185, 129, 0.5)', bgStops: ['#030c12', '#06141c', '#02090e'], orbColor: 'rgba(16, 185, 129, 0.28)' },
+    obsidian: { id: 'obsidian', name: '💎 Obsidian Dark', borderOuter: '#64748b', borderInner: 'rgba(100, 116, 139, 0.4)', accent: '#38bdf8', glow: 'rgba(100, 116, 139, 0.4)', bgStops: ['#080a0e', '#0c1017', '#05070a'], orbColor: 'rgba(100, 116, 139, 0.25)' }
+  };
+
+  function drawCanvasRoundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function renderPnLCardToCanvas(canvas) {
+    const data = pnlShareState.data;
+    if (!canvas || !data) return null;
+    const fmt = pnlShareState.format || 'mobile';
+    const th = PNL_SHARE_THEMES[pnlShareState.theme] || PNL_SHARE_THEMES.rocket;
+    const width = fmt === 'desktop' ? 1920 : 1200;
+    const height = fmt === 'desktop' ? 1080 : fmt === 'square' ? 1200 : 960;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const isProfit = Number(data.profitOrLoss) >= 0;
+    const pnlFormatted = `${isProfit ? '+' : '-'}$${Math.abs(Number(data.profitOrLoss) || 0).toFixed(2)}`;
+    const roiNum = data.startingBalance > 0 ? (data.profitOrLoss / data.startingBalance) * 100 : 0;
+    const roiFormatted = `${roiNum >= 0 ? '+' : ''}${roiNum.toFixed(2)}%`;
+    const cleanGoal = data.strategyGoal || `${tmState.tradesAllowed}T / ${tmState.winsNeeded}W`;
+
+    // Procedural Corsair-free High-Res Backdrop
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, th.bgStops[0]);
+    bgGrad.addColorStop(0.5, th.bgStops[1]);
+    bgGrad.addColorStop(1, th.bgStops[2]);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    const orbGrad = ctx.createRadialGradient(width * 0.78, height * 0.25, 20, width * 0.78, height * 0.25, width * 0.45);
+    orbGrad.addColorStop(0, th.orbColor);
+    orbGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = orbGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Subtle Candlestick & Gridlines watermark
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < width; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+
+    // Dual precision frame
+    ctx.save();
+    ctx.strokeStyle = th.borderOuter;
+    ctx.lineWidth = 5;
+    ctx.shadowColor = th.glow;
+    ctx.shadowBlur = 24;
+    drawCanvasRoundedRect(ctx, 24, 24, width - 48, height - 48, 16);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = th.borderInner;
+    ctx.lineWidth = 2;
+    drawCanvasRoundedRect(ctx, 36, 36, width - 72, height - 72, 12);
+    ctx.stroke();
+
+    const padX = fmt === 'desktop' ? 90 : fmt === 'square' ? 70 : 64;
+    let curY = fmt === 'desktop' ? 80 : fmt === 'square' ? 70 : 64;
+    const logoSize = fmt === 'desktop' ? 76 : 64;
+
+    // Vector Gold Emblem
+    const embGrad = ctx.createLinearGradient(padX, curY, padX + logoSize, curY + logoSize);
+    embGrad.addColorStop(0, '#fbbf24');
+    embGrad.addColorStop(1, '#d97706');
+    ctx.fillStyle = embGrad;
+    drawCanvasRoundedRect(ctx, padX, curY, logoSize, logoSize, 14);
+    ctx.fill();
+    ctx.fillStyle = '#090d16';
+    ctx.font = `900 ${Math.round(logoSize * 0.52)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('A', padX + logoSize / 2, curY + logoSize * 0.68);
+
+    const goldGrad = ctx.createLinearGradient(padX + logoSize + 18, curY, padX + 400, curY + 36);
+    goldGrad.addColorStop(0, '#ffe893');
+    goldGrad.addColorStop(0.5, '#f59e0b');
+    goldGrad.addColorStop(1, '#d97706');
+    ctx.fillStyle = goldGrad;
+    ctx.font = `900 ${fmt === 'desktop' ? 34 : 32}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText('ALADDINSNIPER', padX + logoSize + 18, curY + 34);
+    ctx.fillStyle = '#22d3ee';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText('VIP REAL-TIME TRADE SNIPER', padX + logoSize + 18, curY + 60);
+
+    // Top Right Asset Pill
+    const pillW = fmt === 'desktop' ? 380 : 320;
+    const pillH = fmt === 'desktop' ? 64 : 56;
+    const pillX = width - padX - pillW;
+    const isReal = data.accountType === 'REAL';
+    ctx.fillStyle = isReal ? 'rgba(16, 185, 129, 0.16)' : 'rgba(245, 158, 11, 0.16)';
+    drawCanvasRoundedRect(ctx, pillX, curY + 4, pillW, pillH, 10);
+    ctx.fill();
+    ctx.strokeStyle = isReal ? '#10b981' : '#f59e0b';
+    ctx.lineWidth = 2;
+    drawCanvasRoundedRect(ctx, pillX, curY + 4, pillW, pillH, 10);
+    ctx.stroke();
+    ctx.fillStyle = isReal ? '#34d399' : '#fbbf24';
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${data.accountType} · ${data.asset || 'AUD/CHF OTC'}`, pillX + pillW / 2, curY + (fmt === 'desktop' ? 44 : 39));
+
+    const divY = fmt === 'desktop' ? 190 : curY + 94;
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(padX, divY); ctx.lineTo(width - padX, divY); ctx.stroke();
+
+    if (fmt === 'desktop') {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('NET REAL-TIME PROFIT', padX, 260);
+      ctx.save();
+      ctx.fillStyle = isProfit ? '#10b981' : '#f43f5e';
+      ctx.font = '900 100px monospace';
+      ctx.shadowColor = isProfit ? 'rgba(16,185,129,0.7)' : 'rgba(244,63,94,0.7)';
+      ctx.shadowBlur = 28;
+      ctx.fillText(pnlFormatted, padX, 370);
+      ctx.restore();
+
+      ctx.fillStyle = isProfit ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)';
+      drawCanvasRoundedRect(ctx, padX, 410, 260, 68, 10);
+      ctx.fill();
+      ctx.strokeStyle = isProfit ? '#10b981' : '#f43f5e';
+      ctx.lineWidth = 2.5;
+      drawCanvasRoundedRect(ctx, padX, 410, 260, 68, 10);
+      ctx.stroke();
+      ctx.fillStyle = isProfit ? '#6ee7b7' : '#fda4af';
+      ctx.font = '900 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(roiFormatted, padX + 130, 456);
+
+      const rightX = 860, gridW = width - padX - rightX, gap = 20, bW = (gridW - gap) / 2, bH = 135, gridY = 240;
+      const mItems = [
+        { label: 'WIN RATE', val: `${data.winRate}%`, col: '#38bdf8' },
+        { label: 'WON / LOST', val: `${data.winsCount}W / ${data.lossesCount}L`, col: '#ffffff' },
+        { label: 'ENDING BALANCE', val: `$${Number(data.endingBalance).toFixed(2)}`, col: '#ffffff' },
+        { label: 'CYCLE GOAL', val: cleanGoal, col: '#f59e0b' }
+      ];
+      mItems.forEach((m, idx) => {
+        const col = idx % 2, row = Math.floor(idx / 2), bx = rightX + col * (bW + gap), by = gridY + row * (bH + gap);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; drawCanvasRoundedRect(ctx, bx, by, bW, bH, 12); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.5; drawCanvasRoundedRect(ctx, bx, by, bW, bH, 12); ctx.stroke();
+        ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 15px sans-serif'; ctx.fillText(m.label, bx + 20, by + 38);
+        ctx.fillStyle = m.col; ctx.font = '900 30px monospace'; ctx.fillText(m.val, bx + 20, by + 94);
+      });
+      curY = 620;
+    } else {
+      curY = divY + 48;
+      ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('NET REAL-TIME PROFIT', padX, curY);
+      curY += 80;
+      ctx.save();
+      ctx.fillStyle = isProfit ? '#10b981' : '#f43f5e';
+      ctx.font = `900 ${fmt === 'square' ? 88 : 82}px monospace`;
+      ctx.shadowColor = isProfit ? 'rgba(16,185,129,0.7)' : 'rgba(244,63,94,0.7)';
+      ctx.shadowBlur = 24;
+      ctx.fillText(pnlFormatted, padX, curY);
+      ctx.restore();
+
+      const roiW = 240, roiH = 68, roiX = width - padX - roiW, roiY = curY - 70;
+      ctx.fillStyle = isProfit ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)';
+      drawCanvasRoundedRect(ctx, roiX, roiY, roiW, roiH, 12); ctx.fill();
+      ctx.strokeStyle = isProfit ? '#10b981' : '#f43f5e'; ctx.lineWidth = 2.5;
+      drawCanvasRoundedRect(ctx, roiX, roiY, roiW, roiH, 12); ctx.stroke();
+      ctx.fillStyle = isProfit ? '#6ee7b7' : '#fda4af'; ctx.font = '900 32px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(roiFormatted, roiX + roiW / 2, roiY + 46);
+
+      curY += 54;
+      const gap = 16, gridW = width - padX * 2, bW = (gridW - gap) / 2, bH = 132;
+      const mItems = [
+        { label: 'WIN RATE', val: `${data.winRate}%`, col: '#38bdf8' },
+        { label: 'WON / LOST', val: `${data.winsCount}W / ${data.lossesCount}L`, col: '#ffffff' },
+        { label: 'ENDING BALANCE', val: `$${Number(data.endingBalance).toFixed(2)}`, col: '#ffffff' },
+        { label: 'CYCLE GOAL', val: cleanGoal, col: '#f59e0b' }
+      ];
+      mItems.forEach((m, idx) => {
+        const col = idx % 2, row = Math.floor(idx / 2), bx = padX + col * (bW + gap), by = curY + row * (bH + gap);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; drawCanvasRoundedRect(ctx, bx, by, bW, bH, 10); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.5; drawCanvasRoundedRect(ctx, bx, by, bW, bH, 10); ctx.stroke();
+        ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 15px sans-serif'; ctx.fillText(m.label, bx + 22, by + 36);
+        ctx.fillStyle = m.col; ctx.font = '900 30px monospace'; ctx.fillText(m.val, bx + 22, by + 92);
+      });
+      curY += bH * 2 + gap + 32;
+    }
+
+    const secW = width - padX * 2, secH = 112;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; drawCanvasRoundedRect(ctx, padX, curY, secW, secH, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5; drawCanvasRoundedRect(ctx, padX, curY, secW, secH, 12); ctx.stroke();
+    const secList = [
+      { label: 'Starting Deposit', val: `$${Number(data.startingBalance).toFixed(2)}` },
+      { label: 'Trades Executed', val: `${data.tradesCount}` },
+      { label: 'Asset Payout', val: `${data.payoutRate || 92}%` },
+      { label: 'Engine', val: 'Aladdin Tiered' }
+    ];
+    const cW = secW / 4;
+    secList.forEach((s, idx) => {
+      const sx = padX + idx * cW + 20;
+      ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(s.label, sx, curY + 38);
+      ctx.fillStyle = '#f1f5f9'; ctx.font = '900 22px monospace'; ctx.fillText(s.val, sx, curY + 78);
+    });
+
+    const footY = height - (fmt === 'desktop' ? 84 : 58);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 16px monospace';
+    ctx.fillText(`VERIFIED SESSION · ${data.timestamp}`, padX, footY);
+    ctx.textAlign = 'right'; ctx.fillStyle = th.accent; ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('✓ ALADDINSNIPER OFFICIAL P&L', width - padX, footY);
+    return canvas;
+  }
+
+  function closePnLShareModal() {
+    pnlShareState.open = false;
+    if (shareOverlayEl) {
+      shareOverlayEl.remove();
+      shareOverlayEl = null;
+    }
+  }
+
+  function getPnLShareText() {
+    const d = pnlShareState.data;
+    if (!d) return '';
+    const isProfit = d.profitOrLoss >= 0;
+    const pnlStr = `${isProfit ? '+' : '-'}$${Math.abs(d.profitOrLoss).toFixed(2)}`;
+    const roi = d.startingBalance > 0 ? ((d.profitOrLoss / d.startingBalance) * 100).toFixed(2) : '0.00';
+    return [
+      'ALADDINSNIPER VIP P&L REPORT',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━',
+      `${isProfit ? 'PROFIT' : 'LOSS'}: ${pnlStr} (${Number(roi) >= 0 ? '+' : ''}${roi}% ROI)`,
+      `Asset: ${d.asset || 'AUD/CHF OTC'} (${d.payoutRate || 92}% Payout)`,
+      `Session: ${d.winsCount}W / ${d.lossesCount}L (${d.winRate}% Win Rate)`,
+      `Ending Balance: $${Number(d.endingBalance).toFixed(2)}`,
+      `Goal: ${d.strategyGoal || `${tmState.tradesAllowed}T / ${tmState.winsNeeded}W`}`,
+      `Account: ${d.accountType} (Verified)`,
+      `Date: ${d.timestamp}`
+    ].join('\n');
+  }
+
+  function renderPnLShareModal() {
+    if (!pnlShareState.open || !pnlShareState.data) { closePnLShareModal(); return; }
+    if (!card || !card.classList.contains('fullscreen')) {
+      card.classList.add('fullscreen');
+    }
+    if (!shareOverlayEl) {
+      shareOverlayEl = document.createElement('div');
+      shareOverlayEl.id = 'al-pnl-share-modal';
+      document.body.appendChild(shareOverlayEl);
+    }
+    const shareText = encodeURIComponent(getPnLShareText());
+    shareOverlayEl.innerHTML = `
+      <div class="al-share-dialog">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
+          <div>
+            <strong style="font-size:13px;color:#fff;">HD P&L Share Card Generator</strong>
+            <span style="display:block;font-size:9.5px;color:#64748b;">${escHtml(pnlShareState.data.title || 'Verified Session Report')}</span>
+          </div>
+          <button data-sh-act="close" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#cbd5e1;width:26px;height:26px;border-radius:5px;cursor:pointer;font-weight:900;">✕</button>
+        </div>
+
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:space-between;align-items:center;">
+          <div style="display:flex;gap:4px;">
+            ${[
+              { id: 'mobile', label: 'Mobile' },
+              { id: 'desktop', label: 'Desktop 16:9' },
+              { id: 'square', label: 'Square 1:1' }
+            ].map(f => `<button data-sh-fmt="${f.id}" class="al-mode-btn ${pnlShareState.format === f.id ? 'active' : ''}">${f.label}</button>`).join('')}
+          </div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap;">
+            ${Object.values(PNL_SHARE_THEMES).map(t => `<button data-sh-th="${t.id}" class="al-nk-chip ${pnlShareState.theme === t.id ? 'active' : ''}">${t.name}</button>`).join('')}
+          </div>
+        </div>
+
+        <div style="background:#050810;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px;display:flex;justify-content:center;align-items:center;">
+          <canvas id="al-pnl-share-canvas" style="max-width:100%;max-height:48vh;border-radius:4px;display:block;"></canvas>
+        </div>
+
+        ${pnlShareState.toastMsg ? `<div style="font-size:10px;font-weight:800;color:#34d399;text-align:center;">${escHtml(pnlShareState.toastMsg)}</div>` : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <button data-sh-act="download" style="padding:8px 6px;border-radius:5px;border:none;background:#f59e0b;color:#000;font-weight:900;font-size:10.5px;cursor:pointer;">⬇ Download PNG</button>
+          <button data-sh-act="copyImg" style="padding:8px 6px;border-radius:5px;border:1px solid rgba(56,189,248,0.4);background:rgba(56,189,248,0.16);color:#67e8f9;font-weight:800;font-size:10.5px;cursor:pointer;">${pnlShareState.copiedImage ? '✓ Copied!' : '🖼 Copy Image'}</button>
+          <button data-sh-act="copyTxt" style="padding:8px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#e2e8f0;font-weight:800;font-size:10.5px;cursor:pointer;">${pnlShareState.copiedText ? '✓ Copied!' : '📋 Copy Text'}</button>
+          <a href="https://wa.me/?text=${shareText}" target="_blank" rel="noopener noreferrer" style="padding:8px 6px;border-radius:5px;border:1px solid rgba(16,185,129,0.45);background:rgba(16,185,129,0.18);color:#34d399;font-weight:900;font-size:10.5px;text-decoration:none;display:flex;align-items:center;justify-content:center;">WhatsApp Share</a>
+        </div>
+      </div>
+    `;
+
+    const canvas = shareOverlayEl.querySelector('#al-pnl-share-canvas');
+    renderPnLCardToCanvas(canvas);
+
+    shareOverlayEl.onclick = (e) => {
+      if (e.target === shareOverlayEl) { closePnLShareModal(); return; }
+      const fmtBtn = e.target.closest('[data-sh-fmt]');
+      if (fmtBtn) {
+        pnlShareState.format = fmtBtn.getAttribute('data-sh-fmt') || 'mobile';
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        renderPnLShareModal();
+        return;
+      }
+      const thBtn = e.target.closest('[data-sh-th]');
+      if (thBtn) {
+        pnlShareState.theme = thBtn.getAttribute('data-sh-th') || 'rocket';
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        renderPnLShareModal();
+        return;
+      }
+      const actEl = e.target.closest('[data-sh-act]');
+      if (actEl) {
+        const act = actEl.getAttribute('data-sh-act');
+        if (act === 'close') {
+          closePnLShareModal();
+        } else if (act === 'download') {
+          const cv = renderPnLCardToCanvas(shareOverlayEl.querySelector('#al-pnl-share-canvas') || document.createElement('canvas'));
+          if (cv) {
+            const url = cv.toDataURL('image/png', 1.0);
+            const a = document.createElement('a');
+            a.download = `aladdinsniper-${pnlShareState.theme}-${pnlShareState.format}-${Date.now()}.png`;
+            a.href = url;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+            pnlShareState.toastMsg = 'PNG downloaded!';
+            renderPnLShareModal();
+          }
+        } else if (act === 'copyTxt') {
+          const txt = getPnLShareText();
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).catch(() => {});
+          playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+          pnlShareState.copiedText = true;
+          pnlShareState.toastMsg = 'Report text copied!';
+          renderPnLShareModal();
+        } else if (act === 'copyImg') {
+          const cv = renderPnLCardToCanvas(shareOverlayEl.querySelector('#al-pnl-share-canvas') || document.createElement('canvas'));
+          if (cv && cv.toBlob) {
+            cv.toBlob(async (blob) => {
+              try {
+                if (blob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                  pnlShareState.copiedImage = true;
+                  pnlShareState.toastMsg = 'HD Card image copied to clipboard!';
+                  playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+                } else {
+                  pnlShareState.toastMsg = 'Use Download PNG on this browser';
+                }
+              } catch {
+                pnlShareState.toastMsg = 'Use Download PNG on this browser';
+              }
+              renderPnLShareModal();
+            }, 'image/png');
+          }
+        }
+      }
+    };
+  }
+
+  function openPnLShareModal(data) {
+    pnlShareState.data = data;
+    pnlShareState.copiedImage = false;
+    pnlShareState.copiedText = false;
+    pnlShareState.toastMsg = null;
+    pnlShareState.open = true;
+    playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+    renderPnLShareModal();
   }
 
   // -------------------------------------------------------------------------
@@ -3488,6 +4587,8 @@
     const c = getTMComputed();
     const pl = Number((endBal - tmState.sessionStartBalance).toFixed(2));
     const now = new Date();
+    const won = tradesList.filter(t => t.result === 'WIN').length;
+    const lost = tradesList.filter(t => t.result === 'LOSS').length;
     const logged = {
       id: Date.now().toString(),
       date: now.toISOString(),
@@ -3501,8 +4602,8 @@
       gainTargetPercent: c.planMetrics.accountGainPercent,
       winProfit: c.planMetrics.targetProfit,
       endingBalance: endBal,
-      won: tradesList.filter(t => t.result === 'WIN').length,
-      lost: tradesList.filter(t => t.result === 'LOSS').length,
+      won,
+      lost,
       profitOrLoss: pl,
       trades: tradesList
     };
@@ -3513,10 +4614,28 @@
     tmState.showCompleteModal = true;
     savePersistedState();
     renderTradeManager();
+    if (pl > 0) {
+      const totalTrades = won + lost;
+      const winRate = totalTrades > 0 ? Math.round((won / totalTrades) * 100) : 100;
+      setTimeout(() => {
+        openFireworksOverlay({
+          title: 'TARGET ACHIEVED',
+          winProfit: pl,
+          winRate,
+          currentBalance: endBal,
+          startBalance: tmState.sessionStartBalance,
+          winsCount: won,
+          lossesCount: lost,
+          assetName: poAsset || tmState.selectedAsset
+        });
+      }, 180);
+    } else {
+      playSoundEffect('target', toolsState.soundVolume, toolsState.toneStyle);
+    }
   }
 
   function startNewTMSession() {
-    playTMBeep('click');
+    playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
     tmState.sessionStartBalance = tmState.currentBalance;
     tmState.sessionTrades = [];
     tmState.sessionActive = true;
@@ -3529,7 +4648,7 @@
   }
 
   function resetEntireTMSession(startBal = tmState.balance) {
-    playTMBeep('click');
+    playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
     tmState.sessionStartBalance = startBal;
     tmState.currentBalance = startBal;
     tmState.sessionTrades = [];
@@ -3542,7 +4661,7 @@
   }
 
   function resetTMFactoryDefaults() {
-    playTMBeep('click');
+    playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
     const defBal = (poBalance && poBalance > 0) ? Number(poBalance.toFixed(2)) : 2131.89;
     tmState.balance = defBal;
     tmState.userEditedBalance = false;
@@ -3559,19 +4678,12 @@
     const c = getTMComputed();
     if (!tmState.sessionActive || c.winsLeft === 0 || c.tradesRemaining === 0) return;
 
-    if (result === 'WIN') {
-      const lastTwo = tmState.sessionTrades.slice(-2);
-      const isStreak = lastTwo.length >= 2 && lastTwo.every(t => t.result === 'WIN');
-      playTMBeep(isStreak ? 'target' : 'win');
-    } else {
-      playTMBeep('loss');
-    }
-
     const stake = (overrideStake && overrideStake > 0) ? overrideStake : c.nextStake;
     const P = tmState.payoutRate / 100;
     const newBal = result === 'WIN'
       ? Number((tmState.currentBalance + stake * P).toFixed(2))
       : Number((tmState.currentBalance - stake).toFixed(2));
+    const profitAmt = Number((stake * P).toFixed(2));
 
     const record = {
       step: c.currentStep,
@@ -3581,15 +4693,28 @@
       payoutRate: tmState.payoutRate,
       balanceAfter: newBal
     };
+    const lastTwo = tmState.sessionTrades.slice(-2);
+    const isStreak = result === 'WIN' && lastTwo.length >= 2 && lastTwo.every(t => t.result === 'WIN');
     tmState.sessionTrades.push(record);
     tmState.currentBalance = newBal;
 
     const updatedWins = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
     if (updatedWins >= tmState.winsNeeded || newBal >= c.planMetrics.capitalGoal || tmState.sessionTrades.length >= tmState.tradesAllowed) {
-      playTMBeep('target');
       endTMSession(newBal, tmState.sessionTrades);
     } else {
-      const nextAfter = getTMComputed().nextStake;
+      playSoundEffect(isStreak ? 'streak' : result === 'WIN' ? 'win' : 'loss', toolsState.soundVolume, toolsState.toneStyle);
+      const nextCalc = getTMComputed();
+      const nextAfter = nextCalc.nextStake;
+      if (toolsState.voiceAnnounceEnabled) {
+        const msg = toolsState.voiceLanguage === 'Hindi'
+          ? (result === 'WIN'
+            ? (isStreak ? `लगातार जीत की स्ट्रीक! प्लस ${profitAmt.toFixed(0)} डॉलर, अगला स्टेक तैयार है।` : `ट्रेड जीत गए! प्लस ${profitAmt.toFixed(0)} डॉलर, अगला स्टेक ${nextAfter.toFixed(2)} डॉलर।`)
+            : `ट्रेड लॉस हुआ, रिकवरी स्टेक ${nextAfter.toFixed(2)} डॉलर तैयार है।`)
+          : (result === 'WIN'
+            ? (isStreak ? `Winning streak! Plus ${profitAmt.toFixed(2)} dollars. Next stake ${nextAfter.toFixed(2)} dollars.` : `Trade Won! Plus ${profitAmt.toFixed(2)} dollars. Next stake ${nextAfter.toFixed(2)} dollars.`)
+            : `Trade Loss. Recovery stake ${nextAfter.toFixed(2)} dollars ready.`);
+        speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume);
+      }
       if (autoApplyStake && nextAfter > 0) applyStake(nextAfter, false);
       savePersistedState();
       renderTradeManager();
@@ -4081,6 +5206,7 @@
 
     activeTrade = null;
     if (activeTradeBox) activeTradeBox.style.display = 'none';
+    syncFixedDockVisibility();
     renderTradeManager();
     updateLogsDisplay();
     savePersistedState();
@@ -4102,14 +5228,23 @@
 
     activeTrade = null;
     if (activeTradeBox) activeTradeBox.style.display = 'none';
+    syncFixedDockVisibility();
     renderTradeManager();
     updateLogsDisplay();
     savePersistedState();
   }
 
+  function syncFixedDockVisibility() {
+    if (!fixedDockEl) return;
+    const showActive = !!(activeTrade && activeTradeBox && activeTradeBox.style.display !== 'none');
+    const showNotify = !!(notifyBox && (notifyBox.classList.contains('success') || notifyBox.classList.contains('error')));
+    fixedDockEl.style.display = (showActive || showNotify) ? 'flex' : 'none';
+  }
+
   function updateActiveTradeTicker() {
     if (!activeTrade) {
       if (activeTradeBox) activeTradeBox.style.display = 'none';
+      syncFixedDockVisibility();
       return;
     }
     const remMs = activeTrade.endTime - Date.now();
@@ -4135,6 +5270,7 @@
       activeTradeText.style.color = tagColor;
       activeTradeCountdown.textContent = `${remSec}s`;
     }
+    syncFixedDockVisibility();
     if (tmRootEl) {
       const tmSec = tmRootEl.querySelector('#al-tm-order-timer');
       if (tmSec) tmSec.textContent = `${remSec}s`;
@@ -4254,11 +5390,17 @@
     }
   }
 
+  let notifyClearTimeout = null;
   function showNotification(msg, type = 'success') {
     if (!notifyBox) return;
     notifyBox.textContent = msg;
     notifyBox.className = `al-notify ${type}`;
-    setTimeout(() => { if (notifyBox) notifyBox.className = 'al-notify'; }, 2400);
+    syncFixedDockVisibility();
+    if (notifyClearTimeout) clearTimeout(notifyClearTimeout);
+    notifyClearTimeout = setTimeout(() => {
+      if (notifyBox) notifyBox.className = 'al-notify';
+      syncFixedDockVisibility();
+    }, 2400);
   }
 
   function formatStakeStr(val) {
@@ -4288,8 +5430,6 @@
       if (customStakeInput && document.activeElement !== customStakeInput) {
         customStakeInput.value = stakeDisplay;
       }
-      if (callStakeLbl) callStakeLbl.textContent = `$${stakeDisplay}`;
-      if (putStakeLbl) putStakeLbl.textContent = `$${stakeDisplay}`;
 
       if (quickChips) {
         quickChips.forEach(chip => {
@@ -4315,8 +5455,6 @@
 
     const stakeDisplay = formatStakeStr(currentStake);
     if (customStakeInput) customStakeInput.value = stakeDisplay;
-    if (callStakeLbl) callStakeLbl.textContent = `$${stakeDisplay}`;
-    if (putStakeLbl) putStakeLbl.textContent = `$${stakeDisplay}`;
     if (estProfitLbl) estProfitLbl.textContent = (currentStake * (currentPayout / 100)).toFixed(2);
     if (scrapeSourceLbl) scrapeSourceLbl.textContent = 'Synced';
 
@@ -4599,23 +5737,36 @@
           </table>
         </div>
       `;
-    } else {
+    } else if (mxState.viewMode === 'projector') {
       const proj = calcGoalProjectionMx(startAmt, isDaily ? mxState.daily.targetGoal : mxState.step.targetGoal, isDaily ? mxState.daily.dailyReturnRate : 8, isDaily ? mxState.daily.reinvestmentPercent : 70);
       subViewHtml = `
         <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:9px;font-weight:900;color:#fff;text-transform:uppercase;">Goal Projection & Milestones</span>
+            <span style="font-size:9px;font-weight:900;color:#fff;text-transform:uppercase;">Reverse Goal Projector</span>
             <span class="al-tag-sq" style="background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);">${proj.riskRating}</span>
           </div>
           <div class="al-tm-grid2" style="gap:5px;font-family:monospace;">
-            <div style="padding:5px;background:rgba(0,0,0,0.35);border-radius:4px;">
+            <div style="padding:6px;background:rgba(0,0,0,0.35);border-radius:4px;">
               <span style="font-size:8px;color:#64748b;display:block;">EST. DAYS TO GOAL</span>
               <strong style="color:#22d3ee;font-size:12px;">${proj.targetDaysNeeded !== null ? `${proj.targetDaysNeeded} Trading Days` : '>1500 Days'}</strong>
             </div>
-            <div style="padding:5px;background:rgba(0,0,0,0.35);border-radius:4px;">
+            <div style="padding:6px;background:rgba(0,0,0,0.35);border-radius:4px;">
               <span style="font-size:8px;color:#64748b;display:block;">REQ DAILY (30D / 60D)</span>
               <strong style="color:#34d399;font-size:11px;">${proj.req30}% / ${proj.req60}%</strong>
             </div>
+          </div>
+          <div style="padding:6px;background:rgba(0,0,0,0.28);border:1px solid rgba(255,255,255,0.06);border-radius:4px;font-size:9.5px;color:#94a3b8;display:flex;justify-content:space-between;font-family:monospace;">
+            <span>Target: <strong style="color:#fff;">${fmtMoney(isDaily ? mxState.daily.targetGoal : mxState.step.targetGoal)}</strong></span>
+            <span>Reinvest: <strong style="color:#34d399;">${isDaily ? mxState.daily.reinvestmentPercent : 70}%</strong></span>
+          </div>
+        </div>
+      `;
+    } else {
+      subViewHtml = `
+        <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:9px;font-weight:900;color:#fff;text-transform:uppercase;">Wealth Milestones Roadmap</span>
+            <span style="font-size:8.5px;color:#34d399;font-family:monospace;font-weight:800;">${res.milestones.filter(m => m.projectedIndex !== null).length}/${res.milestones.length} Reached</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:3px;">
             ${res.milestones.map(m => `
@@ -4647,10 +5798,11 @@
         ${tiersHtml}
         ${inputsHtml}
 
-        <div style="display:flex;gap:3px;">
-          <button data-mx-view="chart" class="al-mode-btn ${mxState.viewMode === 'chart' ? 'active' : ''}">Growth Chart</button>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;">
+          <button data-mx-view="chart" class="al-mode-btn ${mxState.viewMode === 'chart' ? 'active' : ''}">Chart</button>
           <button data-mx-view="schedule" class="al-mode-btn ${mxState.viewMode === 'schedule' ? 'active' : ''}">Schedule</button>
           <button data-mx-view="milestones" class="al-mode-btn ${mxState.viewMode === 'milestones' ? 'active' : ''}">Milestones</button>
+          <button data-mx-view="projector" class="al-mode-btn ${mxState.viewMode === 'projector' ? 'active' : ''}">Projector</button>
         </div>
 
         ${subViewHtml}
@@ -4658,8 +5810,204 @@
     `;
   }
 
+  function renderToolsTabHTML() {
+    const volPct = Math.round((toolsState.soundVolume || 0) * 100);
+    const cats = toolsState.soundCategories || {};
+    const samplePayload = JSON.stringify({
+      event: 'ALADDINSNIPER_TRADE_SIGNAL',
+      asset: poAsset || tmState.selectedAsset,
+      direction: realSignal === 'PUT' ? 'SELL' : 'BUY',
+      stake: Number((getTMComputed().nextStake || 1).toFixed(2)),
+      payoutPercent: tmState.payoutRate,
+      balance: Number(tmState.currentBalance.toFixed(2)),
+      timestamp: new Date().toISOString()
+    }, null, 2);
+
+    return `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <!-- 1. AUDIO & JINGLES ENGINE -->
+        <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;">🔊</span>
+              <div>
+                <strong style="font-size:11px;color:#fff;display:block;">Audio &amp; Jingles Engine</strong>
+                <span style="font-size:8.5px;color:#64748b;">Web Audio Synth + Dynamic Compressor</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div id="al-tools-vis-bars" class="al-tools-vis ${toolsUIState.isAudioPlaying ? 'playing' : ''}">
+                <span></span><span></span><span></span><span></span>
+                <em id="al-tools-vis-lbl" style="font-style:normal;font-size:8px;font-family:monospace;color:#34d399;margin-left:3px;">${toolsUIState.activeAudioEvent || 'READY'}</em>
+              </div>
+              <button data-tools-act="toggleSound" class="al-micro-btn" style="${toolsState.soundEnabled ? 'background:rgba(16,185,129,0.2);color:#34d399;border-color:#10b981;' : 'color:#94a3b8;'}">${toolsState.soundEnabled ? 'ON' : 'OFF'}</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:7px;background:rgba(0,0,0,0.35);padding:5px 7px;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:9px;font-weight:800;color:#94a3b8;white-space:nowrap;">VOL ${volPct}%</span>
+            <input id="al-tools-vol" type="range" min="0" max="100" value="${volPct}" style="flex:1;accent-color:#f59e0b;cursor:pointer;" />
+            <button data-tools-act="toggleMute" class="al-micro-btn" style="${volPct === 0 ? 'color:#fb7185;border-color:rgba(244,63,94,0.45);' : ''}">${volPct === 0 ? 'UNMUTE' : 'MUTE'}</button>
+          </div>
+
+          <div>
+            <span class="al-tm-lbl" style="margin-bottom:4px;">SOUND PACKS</span>
+            <div class="al-tm-grid2" style="gap:4px;">
+              ${SOUND_PACKS.map(pk => {
+                const act = toolsState.toneStyle === pk.id;
+                return `
+                  <div style="padding:6px;border-radius:4px;border:1px solid ${act ? pk.border : 'rgba(255,255,255,0.08)'};background:${act ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.32)'};display:flex;flex-direction:column;gap:4px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
+                      <strong data-tools-pack="${pk.id}" style="font-size:9.5px;color:${act ? pk.text : '#e2e8f0'};cursor:pointer;">${escHtml(pk.name)}</strong>
+                      <span class="al-tag-sq" style="border-color:rgba(255,255,255,0.12);color:#94a3b8;">${escHtml(pk.badge)}</span>
+                    </div>
+                    <div style="font-size:8px;color:#64748b;line-height:1.25;">${escHtml(pk.desc)}</div>
+                    <div style="display:flex;gap:4px;">
+                      <button data-tools-pack="${pk.id}" class="al-micro-btn" style="flex:1;${act ? `background:${pk.border};color:#000;border-color:${pk.border};` : ''}">${act ? '✓ Active' : 'Select'}</button>
+                      <button data-tools-audition="${pk.id}" class="al-micro-btn" style="color:#fbbf24;border-color:rgba(245,158,11,0.35);">▶</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div>
+            <span class="al-tm-lbl" style="margin-bottom:4px;">AUDIO EVENT FILTERS</span>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;">
+              ${[
+                { k: 'signals', l: 'Signals' },
+                { k: 'wins', l: 'Wins/Streak' },
+                { k: 'losses', l: 'Losses' },
+                { k: 'milestones', l: 'Target Goal' },
+                { k: 'clicks', l: 'UI Clicks' },
+                { k: 'countdown', l: 'Countdown' }
+              ].map(c => {
+                const on = cats[c.k] !== false;
+                return `<button data-tools-cat="${c.k}" class="al-nk-chip ${on ? 'active' : ''}" style="justify-content:space-between;padding:0 5px;"><span>${c.l}</span><span>${on ? '✓' : '✕'}</span></button>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <div>
+            <span class="al-tm-lbl" style="margin-bottom:4px;">LIVE SOUNDBOARD &amp; FX TEST</span>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;">
+              <button data-tools-act="testWin" class="al-micro-btn" style="color:#34d399;">Win Chime</button>
+              <button data-tools-act="testStreak" class="al-micro-btn" style="color:#fbbf24;">Streak Arp</button>
+              <button data-tools-act="testTarget" class="al-micro-btn" style="color:#67e8f9;">Fanfare</button>
+              <button data-tools-act="testSignal" class="al-micro-btn" style="color:#38bdf8;">Radar Ping</button>
+              <button data-tools-act="testLoss" class="al-micro-btn" style="color:#fda4af;">Soft Loss</button>
+              <button data-tools-act="testStage" class="al-micro-btn" style="color:#c084fc;">Stage Lock</button>
+              <button data-tools-act="testCountdown" class="al-micro-btn">Tick</button>
+              <button data-tools-act="testFireworks" class="al-micro-btn" style="background:rgba(245,158,11,0.2);color:#fbbf24;border-color:rgba(245,158,11,0.5);">💥 FIREWORKS FX</button>
+            </div>
+          </div>
+
+          <!-- 2-WAY VOICE SWITCHER -->
+          <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:6px;display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9.5px;font-weight:800;color:#fff;">🗣 Spoken Voice Announcer</span>
+              <button data-tools-act="toggleVoice" class="al-micro-btn" style="${toolsState.voiceAnnounceEnabled ? 'background:rgba(16,185,129,0.2);color:#34d399;border-color:#10b981;' : 'color:#94a3b8;'}">${toolsState.voiceAnnounceEnabled ? 'ACTIVE' : 'DISABLED'}</button>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button data-tools-vlang="English" class="al-mode-btn ${toolsState.voiceLanguage === 'English' ? 'active' : ''}">🇺🇸 English</button>
+              <button data-tools-vlang="Hindi" class="al-mode-btn ${toolsState.voiceLanguage === 'Hindi' ? 'active' : ''}">🇮🇳 Hindi (हिंदी)</button>
+              <button data-tools-act="testVoice" class="al-micro-btn" style="color:#fbbf24;border-color:rgba(245,158,11,0.45);">▶ Test Voice</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. VISUAL THEME MODE -->
+        <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:11px;color:#fff;">🎨 Visual Theme Mode</strong>
+            <span class="al-tag-sq" style="color:#22d3ee;border-color:rgba(6,182,212,0.4);text-transform:uppercase;">${escHtml(toolsState.currentTheme)}</span>
+          </div>
+          <div class="al-tm-grid2" style="gap:4px;">
+            ${THEME_OPTIONS.map(th => {
+              const isSel = toolsState.currentTheme === th.id || (toolsState.currentTheme === 'dark' && th.id === 'sniper');
+              return `
+                <button data-tools-theme="${th.id}" style="text-align:left;padding:6px;border-radius:4px;cursor:pointer;border:1px solid ${isSel ? th.palette[1] : 'rgba(255,255,255,0.08)'};background:${isSel ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.35)'};display:flex;flex-direction:column;gap:3px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong style="font-size:9.5px;color:#fff;">${escHtml(th.name)}</strong>
+                    <div style="display:flex;gap:2px;">
+                      ${th.palette.map(c => `<span style="width:7px;height:7px;border-radius:2px;background:${c};border:1px solid rgba(255,255,255,0.2);"></span>`).join('')}
+                    </div>
+                  </div>
+                  <span style="font-size:8px;color:#94a3b8;line-height:1.2;">${escHtml(th.desc)}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- 3. BROKER INTEGRATION HUB -->
+        <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:11px;color:#fff;">🔗 Broker Integration Hub</strong>
+            <span class="al-tag-sq" style="${toolsUIState.pingStatus === 'success' ? 'color:#34d399;border-color:#10b981;' : toolsUIState.pingStatus === 'testing' ? 'color:#fbbf24;border-color:#f59e0b;' : 'color:#94a3b8;'}">${toolsUIState.pingStatus === 'success' ? `200 OK · ${toolsUIState.pingLatency}ms` : toolsUIState.pingStatus === 'testing' ? 'PINGING...' : 'WEBHOOK READY'}</span>
+          </div>
+          <div class="al-comp-field">
+            <label><span>Webhook Endpoint URL</span></label>
+            <input id="al-tools-webhook" type="text" value="${escHtml(toolsState.webhookUrl)}" />
+          </div>
+          <div class="al-comp-field">
+            <label>
+              <span>API Bearer Token</span>
+              <span style="display:flex;gap:4px;">
+                <button data-tools-act="toggleApiKey" class="al-micro-btn" style="height:15px;font-size:8px;">${toolsUIState.showApiKey ? 'Hide' : 'Show'}</button>
+                <button data-tools-act="copyApiKey" class="al-micro-btn" style="height:15px;font-size:8px;color:#67e8f9;">${toolsUIState.copiedKey ? 'Copied!' : 'Copy'}</button>
+              </span>
+            </label>
+            <input id="al-tools-apikey" type="${toolsUIState.showApiKey ? 'text' : 'password'}" value="${escHtml(toolsState.apiKey)}" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <button data-tools-act="testPing" class="al-tm-btn-sec" style="color:#22d3ee;border-color:rgba(6,182,212,0.4);">Test Ping</button>
+            <button data-tools-act="togglePayload" class="al-tm-btn-sec">${toolsUIState.showPayloadModal ? 'Hide JSON' : 'Payload JSON'}</button>
+            <button data-tools-act="saveWebhook" style="padding:6px;border-radius:4px;border:none;background:#f59e0b;color:#000;font-weight:900;font-size:10px;cursor:pointer;">${toolsUIState.saveFeedback ? '✓ Saved!' : 'Save Config'}</button>
+          </div>
+          ${toolsUIState.showPayloadModal ? `<pre style="margin:0;padding:6px;border-radius:4px;background:#05080f;border:1px solid rgba(255,255,255,0.1);color:#6ee7b7;font-size:8.5px;overflow-x:auto;font-family:monospace;">${escHtml(samplePayload)}</pre>` : ''}
+        </div>
+
+        <!-- 4. SESSION HISTORY & DATA EXPORT -->
+        <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:11px;color:#fff;">📦 Session History &amp; Data Export</strong>
+            <span style="font-size:9px;color:#64748b;font-family:monospace;">${tmState.sessionLogs.length} Sessions</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+            <button data-tools-act="exportCSV" class="al-tm-btn-sec" style="color:#34d399;border-color:rgba(16,185,129,0.4);">⬇ Export CSV</button>
+            <button data-tools-act="exportJSON" class="al-tm-btn-sec" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);">⬇ Export JSON</button>
+          </div>
+          ${toolsUIState.confirmClearLogs ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;padding:6px;border-radius:4px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.4);">
+              <span style="font-size:9.5px;font-weight:800;color:#fda4af;">Delete all ${tmState.sessionLogs.length} session logs?</span>
+              <div style="display:flex;gap:4px;">
+                <button data-tools-act="confirmClearLogs" class="al-micro-btn" style="background:#f43f5e;color:#fff;border-color:#f43f5e;">Yes, Clear</button>
+                <button data-tools-act="cancelClearLogs" class="al-micro-btn">Cancel</button>
+              </div>
+            </div>
+          ` : `
+            <button data-tools-act="askClearLogs" class="al-tm-btn-sec" style="color:#fda4af;border-color:rgba(244,63,94,0.35);">🗑 Clear Session History (${tmState.sessionLogs.length})</button>
+          `}
+          ${toolsUIState.exportNotice ? `<div style="font-size:9.5px;font-weight:800;color:#34d399;text-align:center;">${escHtml(toolsUIState.exportNotice)}</div>` : ''}
+        </div>
+
+        <!-- 5. FOOTER -->
+        <div class="al-tm-box" style="padding:7px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+          <span style="font-size:9px;color:#94a3b8;font-weight:800;">Aladdin AI • Multi-Asset Protocol</span>
+          <button data-tools-act="resetDefaults" class="al-micro-btn" style="color:#fbbf24;border-color:rgba(245,158,11,0.4);">${toolsUIState.resetFeedback ? '✓ Reset Done' : '↺ Reset Defaults'}</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderTradeManager() {
     if (!tmRootEl) return;
+    const isFsMode = !!(card && card.classList.contains('fullscreen'));
+    if (!isFsMode && (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar')) {
+      tmState.activeSubTab = 'trade';
+    }
     const c = getTMComputed();
     const { planMetrics, currentStep, winsCount, winsLeft, tradesRemaining, currentPL, consecutiveLosses: consL, aladdinScheduleMatrix, capitalRequiredInfo, nextStakeCalc, nextStake, calendarData, logStats } = c;
 
@@ -4670,7 +6018,7 @@
           <span class="al-tag-sq" style="background:rgba(6,182,212,0.14);color:#22d3ee;border-color:rgba(6,182,212,0.4);">TRADE MANAGER</span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button data-tm-act="toggleSync" class="al-tag-sq" style="cursor:pointer;${tmState.autoSyncPO ? 'background:rgba(16,185,129,0.16);color:#34d399;border-color:rgba(16,185,129,0.45);' : 'background:rgba(255,255,255,0.05);color:#94a3b8;border-color:rgba(255,255,255,0.12);'}" title="Auto-sync PO Balance, Payout & Asset">PO ${tmState.autoSyncPO ? 'SYNCED' : 'MANUAL'}</button>
+          <button data-tm-act="toggleSync" class="al-tag-sq" style="cursor:pointer;${tmState.autoSyncPO ? 'background:rgba(16,185,129,0.16);color:#34d399;border-color:rgba(16,185,129,0.45);' : 'background:rgba(255,255,255,0.05);color:#94a3b8;border-color:rgba(255,255,255,0.12);'}" title="Auto-sync PO Balance, Payout &amp; Asset">PO ${tmState.autoSyncPO ? 'SYNCED' : 'MANUAL'}</button>
           <span class="al-tag-sq" style="${poAccountType === 'REAL' ? 'background:rgba(16,185,129,0.15);color:#34d399;border-color:#10b981;' : 'background:rgba(245,158,11,0.15);color:#fbbf24;border-color:#f59e0b;'}">${poAccountType}</span>
         </div>
       </div>
@@ -4679,11 +6027,12 @@
         ${[
           { id: 'trade', label: 'Trade' },
           { id: 'settings', label: 'Settings' },
-          { id: 'session_log', label: 'Log' },
-          { id: 'calendar', label: 'P&L' },
+          { id: 'session_log', label: 'Log', fsOnly: true },
+          { id: 'calendar', label: 'P&L', fsOnly: true },
           { id: 'schedule', label: 'Schedule' },
-          { id: 'matrix', label: 'Matrix' }
-        ].map(t => `<button data-tm-sub="${t.id}" class="al-tm-subtab ${tmState.activeSubTab === t.id ? 'active' : ''}">${t.label}</button>`).join('')}
+          { id: 'matrix', label: 'Matrix' },
+          { id: 'tools', label: 'Tools' }
+        ].map(t => `<button data-tm-sub="${t.id}" class="al-tm-subtab ${t.fsOnly ? 'al-fs-only' : ''} ${tmState.activeSubTab === t.id ? 'active' : ''}">${t.label}</button>`).join('')}
       </div>
     `;
 
@@ -4736,9 +6085,9 @@
         <div style="display:flex;flex-direction:column;gap:6px;">
           ${tmState.tradeActionMode === 'BUY_SELL' ? `
             <div style="display:flex;align-items:center;gap:5px;">
-              <button data-tm-act="execBuy" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-call" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▲ BUY $${nextStake.toFixed(2)}</button>
+              <button id="al-tm-exec-buy" data-tm-act="execBuy" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-call" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▲ BUY $${nextStake.toFixed(2)}</button>
               <button data-tm-act="toggleTradeMode" class="al-tm-switch-orb" style="border-color:rgba(245,158,11,0.8);color:#fcd34d;" title="Switch to WIN / LOSS">⇄</button>
-              <button data-tm-act="execSell" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-put" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▼ SELL $${nextStake.toFixed(2)}</button>
+              <button id="al-tm-exec-sell" data-tm-act="execSell" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-put" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▼ SELL $${nextStake.toFixed(2)}</button>
             </div>
           ` : `
             <div style="display:flex;align-items:center;gap:5px;">
@@ -4824,7 +6173,7 @@
         ` : ''}
 
         <div style="display:flex;gap:5px;">
-          <button data-tm-sub="session_log" class="al-tm-btn-sec" style="flex:1;color:#fbbf24;border-color:rgba(245,158,11,0.35);">Log</button>
+          <button data-tm-sub="session_log" class="al-tm-btn-sec al-fs-only" style="flex:1;color:#fbbf24;border-color:rgba(245,158,11,0.35);">Log</button>
           <button data-tm-sub="matrix" class="al-tm-btn-sec" style="flex:1;color:#22d3ee;border-color:rgba(6,182,212,0.35);">Matrix</button>
           <button data-tm-sub="schedule" class="al-tm-btn-sec" style="flex:1;color:#34d399;border-color:rgba(16,185,129,0.35);">Schedule</button>
         </div>
@@ -4871,11 +6220,23 @@
           </div>
           <div class="al-tm-box" style="padding:6px;">
             <span class="al-tm-lbl">TRADES (2-30)</span>
-            <input type="number" min="2" max="30" id="al-tm-set-trades" value="${tmState.tradesAllowed}" style="width:100%;background:transparent;border:none;color:#fff;font-family:monospace;font-weight:800;font-size:12px;outline:none;" />
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" min="2" max="30" id="al-tm-set-trades" value="${tmState.tradesAllowed}" style="width:100%;background:transparent;border:none;color:#fff;font-family:monospace;font-weight:800;font-size:12px;outline:none;" />
+              <div style="display:flex;flex-direction:column;gap:1px;">
+                <button data-tm-stepfield="trades:1" class="al-tm-step-mini" title="Increase Trades">▲</button>
+                <button data-tm-stepfield="trades:-1" class="al-tm-step-mini" title="Decrease Trades">▼</button>
+              </div>
+            </div>
           </div>
           <div class="al-tm-box" style="padding:6px;">
             <span class="al-tm-lbl">WINS NEEDED</span>
-            <input type="number" min="1" max="${tmState.tradesAllowed}" id="al-tm-set-wins" value="${tmState.winsNeeded}" style="width:100%;background:transparent;border:none;color:#fff;font-family:monospace;font-weight:800;font-size:12px;outline:none;" />
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" min="1" max="${tmState.tradesAllowed}" id="al-tm-set-wins" value="${tmState.winsNeeded}" style="width:100%;background:transparent;border:none;color:#fff;font-family:monospace;font-weight:800;font-size:12px;outline:none;" />
+              <div style="display:flex;flex-direction:column;gap:1px;">
+                <button data-tm-stepfield="wins:1" class="al-tm-step-mini" title="Increase Wins">▲</button>
+                <button data-tm-stepfield="wins:-1" class="al-tm-step-mini" title="Decrease Wins">▼</button>
+              </div>
+            </div>
           </div>
           <div class="al-tm-box" style="padding:6px;">
             <span class="al-tm-lbl">PAYOUT (%)</span>
@@ -4922,13 +6283,13 @@
         <button data-tm-act="startNewSession" style="width:100%;padding:9px;border-radius:4px;background:#f59e0b;color:#000;font-weight:900;font-size:11.5px;text-transform:uppercase;letter-spacing:0.8px;border:none;cursor:pointer;">Start new session</button>
         <div class="al-tm-grid2" style="gap:5px;">
           <button data-tm-act="factoryReset" class="al-tm-btn-sec" style="color:#fda4af;border-color:rgba(244,63,94,0.35);">↺ Factory Reset</button>
-          <button data-tm-sub="session_log" class="al-tm-btn-sec">Session Log</button>
+          <button data-tm-sub="session_log" class="al-tm-btn-sec al-fs-only">Session Log</button>
         </div>
       `;
     } else if (tmState.activeSubTab === 'session_log') {
       bodyHtml = `
         <div class="al-tm-box" style="padding:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
             <div>
               <span style="font-size:8.5px;font-weight:900;color:#f59e0b;text-transform:uppercase;display:block;">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               <strong style="font-size:13px;color:#fff;">Today's Snapshot</strong>
@@ -4937,7 +6298,10 @@
             <div style="text-align:right;">
               <span class="al-tm-lbl">TODAY'S PROFIT</span>
               <div style="font-size:18px;font-weight:900;font-family:monospace;color:${logStats.todayProfit >= 0 ? '#34d399' : '#fb7185'};">${logStats.todayProfit >= 0 ? `+$${logStats.todayProfit.toFixed(2)}` : `-$${Math.abs(logStats.todayProfit).toFixed(2)}`}</div>
-              <span style="font-size:9px;color:#64748b;font-family:monospace;">All time ${logStats.allTimeProfit >= 0 ? `+$${logStats.allTimeProfit.toFixed(2)}` : `-$${Math.abs(logStats.allTimeProfit).toFixed(2)}`}</span>
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:2px;">
+                <span style="font-size:9px;color:#64748b;font-family:monospace;">All time ${logStats.allTimeProfit >= 0 ? `+$${logStats.allTimeProfit.toFixed(2)}` : `-$${Math.abs(logStats.allTimeProfit).toFixed(2)}`}</span>
+                <button data-tm-act="shareToday" class="al-micro-btn" style="background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.45);">📤 Share Today</button>
+              </div>
             </div>
           </div>
         </div>
@@ -4959,8 +6323,8 @@
           </div>
           <div class="al-tm-table-wrap">
             ${tmState.sessionLogs.length === 0 ? '<div style="text-align:center;color:#64748b;padding:12px;font-size:10px;">No completed sessions logged yet.</div>' : `
-              <table class="al-tm-table" style="min-width:520px;">
-                <thead><tr><th>Session</th><th>Date</th><th>Account Bal</th><th>Trades</th><th>Wins</th><th>Payout</th><th>Goal</th><th>Ending Bal</th><th>W/L</th><th style="text-align:right;">P/L</th></tr></thead>
+              <table class="al-tm-table" style="min-width:560px;">
+                <thead><tr><th>Session</th><th>Date</th><th>Account Bal</th><th>Trades</th><th>Wins</th><th>Payout</th><th>Goal</th><th>Ending Bal</th><th>W/L</th><th>P/L</th><th style="text-align:right;">Share</th></tr></thead>
                 <tbody>
                   ${tmState.sessionLogs.map((log, i) => `
                     <tr>
@@ -4973,7 +6337,8 @@
                       <td>$${Number(log.capitalGoal).toFixed(2)}</td>
                       <td style="font-weight:800;color:#fff;">$${Number(log.endingBalance).toFixed(2)}</td>
                       <td><span style="color:#34d399;">${log.won}</span>/<span style="color:#fb7185;">${log.lost}</span></td>
-                      <td style="text-align:right;font-weight:900;color:${log.profitOrLoss >= 0 ? '#34d399' : '#fb7185'};">${log.profitOrLoss >= 0 ? `+$${Number(log.profitOrLoss).toFixed(2)}` : `-$${Math.abs(Number(log.profitOrLoss)).toFixed(2)}`}</td>
+                      <td style="font-weight:900;color:${log.profitOrLoss >= 0 ? '#34d399' : '#fb7185'};">${log.profitOrLoss >= 0 ? `+$${Number(log.profitOrLoss).toFixed(2)}` : `-$${Math.abs(Number(log.profitOrLoss)).toFixed(2)}`}</td>
+                      <td style="text-align:right;"><button data-tm-share-log="${log.id}" class="al-micro-btn" style="color:#fbbf24;border-color:rgba(245,158,11,0.4);">Card</button></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -5006,16 +6371,19 @@
       bodyHtml = `
         <div class="al-tm-box" style="padding:8px;display:flex;flex-direction:column;gap:7px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <strong style="font-size:12.5px;color:#fff;">P&L Calendar</strong>
+            <strong style="font-size:12.5px;color:#fff;">P&amp;L Calendar</strong>
             <div style="display:flex;align-items:center;gap:6px;">
               <button data-tm-act="prevMonth" class="al-micro-btn">◀</button>
               <span style="font-size:10.5px;font-weight:800;font-family:monospace;color:#fff;">${mNames[tmState.calendarMonth]} ${tmState.calendarYear}</span>
               <button data-tm-act="nextMonth" class="al-micro-btn">▶</button>
             </div>
           </div>
-          <div style="display:flex;align-items:baseline;gap:8px;">
-            <span style="font-size:18px;font-weight:900;font-family:monospace;color:${calendarData.monthTotal >= 0 ? '#34d399' : '#fb7185'};">${calendarData.monthTotal >= 0 ? `+$${calendarData.monthTotal.toFixed(2)}` : `-$${Math.abs(calendarData.monthTotal).toFixed(2)}`}</span>
-            <span style="font-size:10px;color:#64748b;">${calendarData.daysTraded} days traded</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              <span style="font-size:18px;font-weight:900;font-family:monospace;color:${calendarData.monthTotal >= 0 ? '#34d399' : '#fb7185'};">${calendarData.monthTotal >= 0 ? `+$${calendarData.monthTotal.toFixed(2)}` : `-$${Math.abs(calendarData.monthTotal).toFixed(2)}`}</span>
+              <span style="font-size:10px;color:#64748b;">${calendarData.daysTraded} days traded</span>
+            </div>
+            <button data-tm-act="shareMonth" class="al-micro-btn" style="background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.45);">📤 Share Month</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;font-size:8.5px;font-weight:900;color:#64748b;">
             <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
@@ -5085,12 +6453,18 @@
       `;
     } else if (tmState.activeSubTab === 'matrix') {
       bodyHtml = renderMatrixTabHTML();
+    } else if (tmState.activeSubTab === 'tools') {
+      bodyHtml = renderToolsTabHTML();
     }
 
     const completeBanner = tmState.showCompleteModal ? `
       <div class="al-tm-box" style="padding:10px;border-color:#10b981;background:rgba(6,78,59,0.28);text-align:center;display:flex;flex-direction:column;gap:6px;">
         <span style="font-size:9.5px;font-weight:900;color:#6ee7b7;letter-spacing:1.4px;text-transform:uppercase;">TARGET REACHED · SESSION RESULT</span>
-        <div style="font-size:22px;font-weight:900;font-family:monospace;color:#34d399;">+$${Math.max(0, tmState.lastCompletedProfit).toFixed(2)}</div>
+        <div style="font-size:22px;font-weight:900;font-family:monospace;color:${tmState.lastCompletedProfit >= 0 ? '#34d399' : '#fb7185'};">${tmState.lastCompletedProfit >= 0 ? `+$${tmState.lastCompletedProfit.toFixed(2)}` : `-$${Math.abs(tmState.lastCompletedProfit).toFixed(2)}`}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">
+          <button data-tm-act="openFireworks" class="al-micro-btn" style="background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.45);">🎆 Fireworks</button>
+          <button data-tm-act="shareCurrent" class="al-micro-btn al-fs-only" style="background:rgba(56,189,248,0.16);color:#67e8f9;border-color:rgba(56,189,248,0.4);">📤 Share P&amp;L Card</button>
+        </div>
         <div class="al-tm-grid2" style="gap:5px;">
           <button data-tm-act="startNewSession" style="padding:7px;border-radius:4px;background:#f59e0b;color:#000;font-weight:900;font-size:10.5px;border:none;cursor:pointer;">Repeat Session</button>
           <button data-tm-act="dismissComplete" class="al-tm-btn-sec">Close</button>
@@ -6028,12 +7402,20 @@
         .al-chip.active { background: rgba(2, 132, 199, 0.3); border-color: #38bdf8; color: #ffffff; }
 
         .al-fixed-dock {
-          flex-shrink: 0; padding: 7px 8px 8px 8px;
+          flex-shrink: 0; padding: 6px 8px 7px 8px;
           background: rgba(15, 23, 42, 0.96);
           border-top: 1px solid rgba(148, 163, 184, 0.14);
-          display: flex; flex-direction: column; gap: 5px;
+          display: none; flex-direction: column; gap: 5px;
         }
-        .al-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .al-fs-only { display: none !important; }
+        #aladdin-card.fullscreen .al-fs-only { display: inline-flex !important; }
+        .al-tm-step-mini {
+          width: 16px; height: 11px; padding: 0; border-radius: 2px;
+          border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06);
+          color: #94a3b8; font-size: 7px; line-height: 1; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .al-tm-step-mini:hover { background: rgba(245,158,11,0.22); color: #fbbf24; border-color: rgba(245,158,11,0.45); }
         .al-trade-btn {
           padding: 10px 6px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;
           border: none; display: flex; align-items: center; justify-content: center; gap: 5px;
@@ -6169,6 +7551,59 @@
         .al-tm-cal-cell.pos { border-color: rgba(16,185,129,0.45); background: rgba(16,185,129,0.12); color: #e2e8f0; }
         .al-tm-cal-cell.neg { border-color: rgba(244,63,94,0.45); background: rgba(244,63,94,0.12); color: #e2e8f0; }
         .al-tm-cal-cell.empty { background: rgba(14,18,26,0.25); border-color: transparent; }
+
+        /* AUDIO BAR VISUALIZER */
+        .al-tools-vis { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; padding: 0 5px; border-radius: 4px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); }
+        .al-tools-vis span { width: 2.5px; height: 4px; background: #475569; border-radius: 1px; transition: height 0.12s, background 0.12s; }
+        .al-tools-vis.playing span { background: #34d399; animation: alVisBounce 0.4s infinite alternate ease-in-out; }
+        .al-tools-vis.playing span:nth-child(2) { animation-delay: 0.1s; }
+        .al-tools-vis.playing span:nth-child(3) { animation-delay: 0.2s; }
+        .al-tools-vis.playing span:nth-child(4) { animation-delay: 0.3s; }
+        @keyframes alVisBounce { from { height: 3px; } to { height: 11px; } }
+
+        /* 6 VISUAL THEMES (preserving transparent Signal Viewfinder) */
+        #aladdin-card[data-al-theme="arcade"]:not(.al-signal-cam) { background: rgba(10, 8, 26, 0.96); border-color: rgba(34, 211, 238, 0.38); }
+        #aladdin-card[data-al-theme="arcade"] .al-header,
+        #aladdin-card[data-al-theme="arcade"] .al-nav-tabs { background: rgba(14, 10, 38, 0.96); }
+        #aladdin-card[data-al-theme="arcade"] .al-nav-tab.active { color: #22d3ee; border-bottom-color: #ec4899; }
+
+        #aladdin-card[data-al-theme="zen"]:not(.al-signal-cam) { background: rgba(5, 20, 16, 0.96); border-color: rgba(16, 185, 129, 0.38); }
+        #aladdin-card[data-al-theme="zen"] .al-header,
+        #aladdin-card[data-al-theme="zen"] .al-nav-tabs { background: rgba(6, 26, 20, 0.96); }
+        #aladdin-card[data-al-theme="zen"] .al-nav-tab.active { color: #34d399; border-bottom-color: #34d399; }
+
+        #aladdin-card[data-al-theme="cyberpunk"]:not(.al-signal-cam) { background: rgba(12, 6, 24, 0.96); border-color: rgba(217, 70, 239, 0.42); }
+        #aladdin-card[data-al-theme="cyberpunk"] .al-header,
+        #aladdin-card[data-al-theme="cyberpunk"] .al-nav-tabs { background: rgba(18, 8, 34, 0.96); }
+        #aladdin-card[data-al-theme="cyberpunk"] .al-nav-tab.active { color: #e879f9; border-bottom-color: #22d3ee; }
+
+        #aladdin-card[data-al-theme="light"]:not(.al-signal-cam) { background: rgba(24, 34, 54, 0.96); border-color: rgba(56, 189, 248, 0.45); }
+        #aladdin-card[data-al-theme="light"] .al-header,
+        #aladdin-card[data-al-theme="light"] .al-nav-tabs { background: rgba(30, 41, 59, 0.96); }
+        #aladdin-card[data-al-theme="light"] .al-nav-tab.active { color: #7dd3fc; border-bottom-color: #f59e0b; }
+
+        #aladdin-card[data-al-theme="gold"]:not(.al-signal-cam) { background: rgba(18, 14, 7, 0.96); border-color: rgba(251, 191, 36, 0.45); }
+        #aladdin-card[data-al-theme="gold"] .al-header,
+        #aladdin-card[data-al-theme="gold"] .al-nav-tabs { background: rgba(24, 18, 8, 0.96); }
+        #aladdin-card[data-al-theme="gold"] .al-nav-tab.active { color: #fbbf24; border-bottom-color: #fbbf24; }
+
+        /* FIREWORKS OVERLAY & HD P&L SHARE MODAL */
+        #al-fireworks-overlay, #al-pnl-share-modal {
+          position: fixed; inset: 0; z-index: 2147483647;
+          background: rgba(2, 6, 15, 0.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+          display: flex; align-items: center; justify-content: center; padding: 14px;
+          font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .al-fw-card {
+          position: relative; z-index: 2; width: 100%; max-width: 420px; border-radius: 10px; padding: 16px;
+          text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85); color: #f8fafc;
+        }
+        .al-share-dialog {
+          position: relative; z-index: 2; width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto;
+          background: #0c101a; border: 1px solid rgba(245, 158, 11, 0.38); border-radius: 10px;
+          padding: 12px; display: flex; flex-direction: column; gap: 9px;
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9); color: #f8fafc;
+        }
       </style>
 
       <!-- 1. MORPHING LAUNCHER -->
@@ -6377,21 +7812,13 @@
           </div>
         </div>
 
-        <!-- FIXED NON-SCROLLING BOTTOM BUY / SELL DOCK -->
+        <!-- FIXED COLLAPSIBLE STATUS & NOTIFICATION DOCK -->
         <div class="al-fixed-dock">
           <div class="al-active-trade-box" id="al-active-trade-box">
             <span id="al-active-trade-text">▲ BUY $1.11 · Live</span>
             <span id="al-active-trade-countdown" style="background: rgba(2,6,23,0.85); padding: 2px 6px; border-radius: 5px; border: 1px solid currentColor;">15s</span>
           </div>
           <div class="al-notify" id="al-notify-box"></div>
-          <div class="al-actions">
-            <button class="al-trade-btn al-btn-call" id="al-call-btn">
-              <span>▲ BUY <strong id="al-call-stake-lbl">$—</strong></span>
-            </button>
-            <button class="al-trade-btn al-btn-put" id="al-put-btn">
-              <span>▼ SELL <strong id="al-put-stake-lbl">$—</strong></span>
-            </button>
-          </div>
         </div>
 
         <div class="al-corner-resize" id="al-resize-grip" title="Drag to Resize">⤡</div>
@@ -6434,10 +7861,7 @@
     quickChips = root.querySelectorAll('.al-chip');
     payoutPctLbl = root.querySelector('#al-payout-pct');
     estProfitLbl = root.querySelector('#al-est-profit');
-    callStakeLbl = root.querySelector('#al-call-stake-lbl');
-    putStakeLbl = root.querySelector('#al-put-stake-lbl');
-    callBtn = root.querySelector('#al-call-btn');
-    putBtn = root.querySelector('#al-put-btn');
+    fixedDockEl = root.querySelector('.al-fixed-dock');
     notifyBox = root.querySelector('#al-notify-box');
 
     miniSignalBar = root.querySelector('#al-mini-signal-bar');
@@ -6483,6 +7907,8 @@
     navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === initTab));
     tabPanes.forEach(p => p.classList.toggle('active', p.id === `al-pane-${initTab}`));
     card.classList.toggle('al-signal-cam', initTab === 'radar');
+    applyGenieTheme(toolsState.currentTheme);
+    syncFixedDockVisibility();
 
     if (signalModeBtns) {
       signalModeBtns.forEach(btn => {
@@ -6504,8 +7930,10 @@
       audioToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         audioEnabled = !audioEnabled;
+        toolsState.soundEnabled = audioEnabled;
         audioToggleBtn.textContent = audioEnabled ? '🔊' : '🔇';
         savePersistedState();
+        if (savedLayout.activeTab === 'manager' && tmState.activeSubTab === 'tools') renderTradeManager();
       });
     }
 
@@ -6543,10 +7971,58 @@
 
         const subBtn = e.target.closest('[data-tm-sub]');
         if (subBtn) {
-          playTMBeep('click');
-          tmState.activeSubTab = subBtn.getAttribute('data-tm-sub') || 'trade';
+          const targetSub = subBtn.getAttribute('data-tm-sub') || 'trade';
+          const isFs = !!(card && card.classList.contains('fullscreen'));
+          if (!isFs && (targetSub === 'session_log' || targetSub === 'calendar')) {
+            showNotification('Open Fullscreen (⛶) for Session Log & P&L', 'error');
+            return;
+          }
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          tmState.activeSubTab = targetSub;
           savePersistedState();
           renderTradeManager();
+          return;
+        }
+
+        const stepFieldBtn = e.target.closest('[data-tm-stepfield]');
+        if (stepFieldBtn) {
+          const [fld, deltaStr] = (stepFieldBtn.getAttribute('data-tm-stepfield') || '').split(':');
+          const delta = parseInt(deltaStr, 10) || 0;
+          if (fld === 'trades') {
+            const nextT = Math.max(2, Math.min(30, tmState.tradesAllowed + delta));
+            tmState.tradesAllowed = nextT;
+            if (tmState.winsNeeded > nextT) tmState.winsNeeded = nextT;
+          } else if (fld === 'wins') {
+            tmState.winsNeeded = Math.max(1, Math.min(tmState.tradesAllowed, tmState.winsNeeded + delta));
+          }
+          tmState.selectedPreset = `${tmState.tradesAllowed}/${tmState.winsNeeded}`;
+          resetEntireTMSession(tmState.balance);
+          return;
+        }
+
+        const shareLogBtn = e.target.closest('[data-tm-share-log]');
+        if (shareLogBtn) {
+          const lid = shareLogBtn.getAttribute('data-tm-share-log');
+          const logObj = tmState.sessionLogs.find(x => String(x.id) === String(lid));
+          if (logObj) {
+            const w = logObj.won || 0, l = logObj.lost || 0;
+            const tot = w + l;
+            openPnLShareModal({
+              title: `Session Report · ${logObj.dateFormatted}`,
+              profitOrLoss: logObj.profitOrLoss,
+              startingBalance: logObj.accountBalance,
+              endingBalance: logObj.endingBalance,
+              winsCount: w,
+              lossesCount: l,
+              tradesCount: tot || logObj.tradesAllowed,
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              payoutRate: logObj.payoutRate,
+              strategyGoal: `${logObj.tradesAllowed}T / ${logObj.winsNeeded}W`,
+              accountType: poAccountType,
+              asset: poAsset || tmState.selectedAsset,
+              timestamp: logObj.dateFormatted
+            });
+          }
           return;
         }
 
@@ -6685,6 +8161,285 @@
             if (tmState.calendarMonth === 11) { tmState.calendarMonth = 0; tmState.calendarYear += 1; }
             else tmState.calendarMonth += 1;
             renderTradeManager();
+          } else if (act === 'openFireworks') {
+            const curComp = getTMComputed();
+            const pl = tmState.showCompleteModal ? tmState.lastCompletedProfit : curComp.currentPL;
+            const w = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
+            const l = tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
+            const tot = w + l;
+            openFireworksOverlay({
+              title: pl >= 0 ? 'TARGET ACHIEVED' : 'SESSION COMPLETE',
+              winProfit: Math.max(0, pl),
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              currentBalance: tmState.currentBalance,
+              startBalance: tmState.sessionStartBalance,
+              winsCount: w,
+              lossesCount: l,
+              assetName: poAsset || tmState.selectedAsset
+            });
+          } else if (act === 'shareCurrent') {
+            const curComp = getTMComputed();
+            const pl = tmState.showCompleteModal ? tmState.lastCompletedProfit : curComp.currentPL;
+            const w = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
+            const l = tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
+            const tot = w + l;
+            openPnLShareModal({
+              title: 'Live Session Report',
+              profitOrLoss: pl,
+              startingBalance: tmState.sessionStartBalance,
+              endingBalance: tmState.currentBalance,
+              winsCount: w,
+              lossesCount: l,
+              tradesCount: tot || tmState.tradesAllowed,
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              payoutRate: tmState.payoutRate,
+              strategyGoal: `${tmState.tradesAllowed}T / ${tmState.winsNeeded}W`,
+              accountType: poAccountType,
+              asset: poAsset || tmState.selectedAsset,
+              timestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            });
+          } else if (act === 'shareToday') {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const tLogs = tmState.sessionLogs.filter(x => x.dayString === todayStr);
+            const w = tLogs.reduce((a, x) => a + (x.won || 0), 0);
+            const l = tLogs.reduce((a, x) => a + (x.lost || 0), 0);
+            const tot = w + l;
+            const pl = tLogs.reduce((a, x) => a + (x.profitOrLoss || 0), 0);
+            const startBal = tLogs.length ? tLogs[tLogs.length - 1].accountBalance : tmState.sessionStartBalance;
+            const endBal = tLogs.length ? tLogs[0].endingBalance : tmState.currentBalance;
+            openPnLShareModal({
+              title: `Today's Performance (${tLogs.length} Sessions)`,
+              profitOrLoss: pl,
+              startingBalance: startBal,
+              endingBalance: endBal,
+              winsCount: w,
+              lossesCount: l,
+              tradesCount: tot,
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              payoutRate: tmState.payoutRate,
+              strategyGoal: `${tLogs.length} Sessions Today`,
+              accountType: poAccountType,
+              asset: poAsset || tmState.selectedAsset,
+              timestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            });
+          } else if (act === 'shareMonth') {
+            const cal = getTMComputed().calendarData;
+            const mLogs = tmState.sessionLogs.filter(x => {
+              const d = new Date(x.date);
+              return d.getFullYear() === tmState.calendarYear && d.getMonth() === tmState.calendarMonth;
+            });
+            const w = mLogs.reduce((a, x) => a + (x.won || 0), 0);
+            const l = mLogs.reduce((a, x) => a + (x.lost || 0), 0);
+            const tot = w + l;
+            const mNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            openPnLShareModal({
+              title: `${mNames[tmState.calendarMonth]} ${tmState.calendarYear} Report`,
+              profitOrLoss: cal.monthTotal,
+              startingBalance: mLogs.length ? mLogs[mLogs.length - 1].accountBalance : tmState.sessionStartBalance,
+              endingBalance: mLogs.length ? mLogs[0].endingBalance : tmState.currentBalance,
+              winsCount: w,
+              lossesCount: l,
+              tradesCount: tot,
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              payoutRate: tmState.payoutRate,
+              strategyGoal: `${cal.daysTraded} Days Traded`,
+              accountType: poAccountType,
+              asset: poAsset || tmState.selectedAsset,
+              timestamp: `${mNames[tmState.calendarMonth]} ${tmState.calendarYear}`
+            });
+          }
+          return;
+        }
+
+        // Tools Sub-Tab Delegated Handlers
+        const toolsPackBtn = e.target.closest('[data-tools-pack]');
+        if (toolsPackBtn) {
+          toolsState.toneStyle = toolsPackBtn.getAttribute('data-tools-pack') || 'sniper';
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          savePersistedState();
+          renderTradeManager();
+          return;
+        }
+        const toolsAudBtn = e.target.closest('[data-tools-audition]');
+        if (toolsAudBtn) {
+          const pk = toolsAudBtn.getAttribute('data-tools-audition') || 'sniper';
+          playSoundEffect('streak', toolsState.soundVolume, pk);
+          return;
+        }
+        const toolsCatBtn = e.target.closest('[data-tools-cat]');
+        if (toolsCatBtn) {
+          const cat = toolsCatBtn.getAttribute('data-tools-cat');
+          if (cat) {
+            toolsState.soundCategories[cat] = !(toolsState.soundCategories[cat] !== false);
+            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+            savePersistedState();
+            renderTradeManager();
+          }
+          return;
+        }
+        const toolsVlangBtn = e.target.closest('[data-tools-vlang]');
+        if (toolsVlangBtn) {
+          toolsState.voiceLanguage = toolsVlangBtn.getAttribute('data-tools-vlang') === 'Hindi' ? 'Hindi' : 'English';
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          savePersistedState();
+          renderTradeManager();
+          return;
+        }
+        const toolsThemeBtn = e.target.closest('[data-tools-theme]');
+        if (toolsThemeBtn) {
+          const th = toolsThemeBtn.getAttribute('data-tools-theme') || 'sniper';
+          applyGenieTheme(th);
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          savePersistedState();
+          renderTradeManager();
+          return;
+        }
+        const toolsActBtn = e.target.closest('[data-tools-act]');
+        if (toolsActBtn) {
+          const act = toolsActBtn.getAttribute('data-tools-act');
+          if (act === 'toggleSound') {
+            toolsState.soundEnabled = !toolsState.soundEnabled;
+            audioEnabled = toolsState.soundEnabled;
+            if (audioToggleBtn) audioToggleBtn.textContent = audioEnabled ? '🔊' : '🔇';
+            if (toolsState.soundEnabled) playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+            savePersistedState();
+            renderTradeManager();
+          } else if (act === 'toggleMute') {
+            if (toolsState.soundVolume > 0) {
+              toolsState._prevVol = toolsState.soundVolume;
+              toolsState.soundVolume = 0;
+            } else {
+              toolsState.soundVolume = toolsState._prevVol || 0.85;
+              playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+            }
+            savePersistedState();
+            renderTradeManager();
+          } else if (act === 'testWin') {
+            playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testStreak') {
+            playSoundEffect('streak', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testTarget') {
+            playSoundEffect('target', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testSignal') {
+            playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testLoss') {
+            playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testStage') {
+            playSoundEffect('stage', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testCountdown') {
+            playSoundEffect('countdown', toolsState.soundVolume, toolsState.toneStyle);
+          } else if (act === 'testFireworks') {
+            const vid = CELEBRATION_VARIANT_CYCLE[toolsUIState.fireworksThemeIdx % CELEBRATION_VARIANT_CYCLE.length];
+            toolsUIState.fireworksThemeIdx += 1;
+            const w = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
+            const l = tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
+            const tot = w + l;
+            openFireworksOverlay({
+              variant: vid,
+              title: 'TARGET ACHIEVED',
+              winProfit: Math.max(0, getTMComputed().planMetrics.targetProfit || 142.50),
+              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+              currentBalance: tmState.currentBalance,
+              startBalance: tmState.sessionStartBalance,
+              winsCount: w || tmState.winsNeeded,
+              lossesCount: l,
+              assetName: poAsset || tmState.selectedAsset
+            });
+          } else if (act === 'toggleVoice') {
+            toolsState.voiceAnnounceEnabled = !toolsState.voiceAnnounceEnabled;
+            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+            savePersistedState();
+            renderTradeManager();
+          } else if (act === 'testVoice') {
+            const msg = toolsState.voiceLanguage === 'Hindi'
+              ? 'अलादीन स्नाइपर प्रो सक्रिय है। अगला ट्रेड सिग्नल तैयार है।'
+              : 'AladdinSniper Pro voice active. Next trade signal ready.';
+            speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume);
+          } else if (act === 'toggleApiKey') {
+            toolsUIState.showApiKey = !toolsUIState.showApiKey;
+            renderTradeManager();
+          } else if (act === 'copyApiKey') {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(toolsState.apiKey).catch(() => {});
+            }
+            toolsUIState.copiedKey = true;
+            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+            renderTradeManager();
+            setTimeout(() => { toolsUIState.copiedKey = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
+          } else if (act === 'testPing') {
+            toolsUIState.pingStatus = 'testing';
+            renderTradeManager();
+            const t0 = Date.now();
+            setTimeout(() => {
+              toolsUIState.pingStatus = 'success';
+              toolsUIState.pingLatency = Math.max(18, Math.min(84, (Date.now() - t0) % 70 + 22));
+              playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
+              if (tmState.activeSubTab === 'tools') renderTradeManager();
+            }, 380);
+          } else if (act === 'togglePayload') {
+            toolsUIState.showPayloadModal = !toolsUIState.showPayloadModal;
+            renderTradeManager();
+          } else if (act === 'saveWebhook') {
+            savePersistedState();
+            toolsUIState.saveFeedback = true;
+            playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
+            renderTradeManager();
+            setTimeout(() => { toolsUIState.saveFeedback = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
+          } else if (act === 'exportCSV') {
+            const rows = [['Date', 'Start Bal', 'Trades', 'Wins Needed', 'Payout %', 'Goal', 'Ending Bal', 'Won', 'Lost', 'P/L']];
+            tmState.sessionLogs.forEach(x => {
+              rows.push([x.dateFormatted, x.accountBalance, x.tradesAllowed, x.winsNeeded, x.payoutRate, x.capitalGoal, x.endingBalance, x.won, x.lost, x.profitOrLoss]);
+            });
+            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `aladdinsniper_sessions_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+            toolsUIState.exportNotice = `Exported ${tmState.sessionLogs.length} sessions to CSV`;
+            renderTradeManager();
+          } else if (act === 'exportJSON') {
+            const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), sessionLogs: tmState.sessionLogs, toolsState }, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `aladdinsniper_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+            toolsUIState.exportNotice = `Exported JSON backup (${tmState.sessionLogs.length} sessions)`;
+            renderTradeManager();
+          } else if (act === 'askClearLogs') {
+            toolsUIState.confirmClearLogs = true;
+            renderTradeManager();
+          } else if (act === 'confirmClearLogs') {
+            tmState.sessionLogs = [];
+            toolsUIState.confirmClearLogs = false;
+            toolsUIState.exportNotice = 'All session history cleared';
+            playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
+            savePersistedState();
+            renderTradeManager();
+          } else if (act === 'cancelClearLogs') {
+            toolsUIState.confirmClearLogs = false;
+            renderTradeManager();
+          } else if (act === 'resetDefaults') {
+            toolsState = {
+              soundEnabled: true, soundVolume: 0.85, toneStyle: 'sniper',
+              soundCategories: { signals: true, wins: true, losses: true, milestones: true, clicks: true, countdown: true },
+              voiceLanguage: 'English', voiceAnnounceEnabled: true, currentTheme: 'dark',
+              fireworksVariant: 'golden_royal',
+              webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
+              apiKey: 'pk_live_aladdin_sniper_92'
+            };
+            audioEnabled = true;
+            if (audioToggleBtn) audioToggleBtn.textContent = '🔊';
+            applyGenieTheme('dark');
+            toolsUIState.resetFeedback = true;
+            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+            savePersistedState();
+            renderTradeManager();
+            setTimeout(() => { toolsUIState.resetFeedback = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
           }
           return;
         }
@@ -6865,6 +8620,23 @@
           else if (mxIn === 's_pay') mxState.step.payoutRatePercent = Math.max(10, Math.min(100, num));
           savePersistedState();
           if (shouldRerender) renderTradeManager();
+          return;
+        }
+        if (id === 'al-tools-vol') {
+          const pct = Math.max(0, Math.min(100, parseInt(el.value, 10) || 0));
+          toolsState.soundVolume = pct / 100;
+          savePersistedState();
+          if (shouldRerender) renderTradeManager();
+          return;
+        }
+        if (id === 'al-tools-webhook') {
+          toolsState.webhookUrl = el.value;
+          savePersistedState();
+          return;
+        }
+        if (id === 'al-tools-apikey') {
+          toolsState.apiKey = el.value;
+          savePersistedState();
         }
       };
 
@@ -7285,9 +9057,6 @@
       else if (s > 0.1) applyStake(Math.max(0.1, s - 0.1), true);
     });
 
-    callBtn.addEventListener('click', () => executeTrade('CALL', currentStake || 1));
-    putBtn.addEventListener('click', () => executeTrade('PUT', currentStake || 1));
-
     bubble.addEventListener('click', (e) => {
       e.stopPropagation();
       if (isDragging || isResizing) return;
@@ -7305,6 +9074,11 @@
       card.classList.remove('fullscreen');
       card.style.display = 'none';
       bubble.style.display = 'flex';
+      if (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar') {
+        tmState.activeSubTab = 'trade';
+        savePersistedState();
+        if (savedLayout.activeTab === 'manager') renderTradeManager();
+      }
       clampFloatingBounds();
     });
 
@@ -7316,8 +9090,13 @@
       if (!goingFull) {
         card.style.width = `${Math.max(230, savedLayout.width || 304)}px`;
         card.style.height = `${Math.max(250, savedLayout.height || 468)}px`;
+        if (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar') {
+          tmState.activeSubTab = 'trade';
+          savePersistedState();
+        }
         clampFloatingBounds();
       }
+      if (savedLayout.activeTab === 'manager') renderTradeManager();
     });
 
     let startX, startY, initialLeft, initialTop;

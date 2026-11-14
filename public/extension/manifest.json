@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AladdinGenie - Pocket Option Floating Bot",
-  "version": "7.5.0",
-  "version_name": "7.5.0",
-  "description": "AladdinGenie Pro v7.5.0: Full Trade Manager + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner.",
+  "version": "7.6.0",
+  "version_name": "7.6.0",
+  "description": "AladdinGenie Pro v7.6.0: Full Trade Manager (Tools, Audio/Voice Synth, Fireworks, HD Share Card) + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner.",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
