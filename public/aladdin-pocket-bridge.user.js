@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie -> Pocket Option Floating Bot Overlay (Lemur & Quetta Edition)
 // @namespace    https://aladdinsniper.io
-// @version      7.6.0
-// @description  AladdinGenie Pro v7.6.0: Full 1:1 Trade Manager (incl. Tools, Audio/Voice Synth, Fireworks, HD P&L Share) + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner
+// @version      7.7.0
+// @description  AladdinGenie Pro v7.7.0: 1:1 Trade Manager UI/UX (Universal BUY/SELL <-> WIN/LOSS Switch Orb, Tools Folder, Fullscreen Log & P&L, Audio/Voice Synth, Fireworks, HD Share) + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Scanner
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -24,7 +24,7 @@
   if (window.__ALADDIN_GENIE_INJECTED__) return;
   window.__ALADDIN_GENIE_INJECTED__ = true;
 
-  console.log('[AladdinGenie] v7.6.0 PRO Initializing (1:1 Trade Manager + Tools/Synth/Share/Fireworks + 333/444 + Paradox + 60-Candle Hybrid Viewfinder)');
+  console.log('[AladdinGenie] v7.7.0 PRO Initializing (1:1 Trade Manager UI/UX + Universal Switch BUY/SELL Dock + Tools + Fullscreen Log/P&L + 333/444 + Paradox + 60-Candle Viewfinder)');
 
   // =========================================================================
   // 1. REAL-TIME STATE & PERSISTENCE (ZERO DUMMY / ZERO Math.sin SIMULATION)
@@ -482,7 +482,9 @@
   let activeTradeBox, activeTradeText, activeTradeCountdown, audioToggleBtn;
   let balanceVal, accTypeLabel, assetVal, miniBal, syncPill, payoutPctLbl, estProfitLbl, scrapeSourceLbl;
   let quickChips, notifyBox, orderLogsList;
-  let tmRootEl, chRootEl, pxRootEl, dockAutoTag;
+  let tmRootEl, chRootEl, pxRootEl, toolsRootEl, dockActionHostEl, dockAutoTag;
+  let tmCopyFeedback = false;
+  let tmCopyTimer = null;
   let fwOverlayEl, shareOverlayEl;
   let isDragging = false, isResizing = false;
 
@@ -2553,6 +2555,8 @@
     const radarHero = root.querySelector('.al-radar-hero');
     const tmBuy = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-buy') : null;
     const tmSell = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-sell') : null;
+    const dockBuy = dockActionHostEl ? dockActionHostEl.querySelector('#al-dock-exec-buy') : null;
+    const dockSell = dockActionHostEl ? dockActionHostEl.querySelector('#al-dock-exec-sell') : null;
 
     if (signalFlashTimeout) clearTimeout(signalFlashTimeout);
 
@@ -2561,6 +2565,8 @@
     if (miniTakeBtn) miniTakeBtn.classList.remove('al-btn-pulse');
     if (tmBuy) tmBuy.classList.remove('al-btn-pulse');
     if (tmSell) tmSell.classList.remove('al-btn-pulse');
+    if (dockBuy) dockBuy.classList.remove('al-btn-pulse');
+    if (dockSell) dockSell.classList.remove('al-btn-pulse');
     if (radarHero) radarHero.classList.remove('flash-call', 'flash-put');
     if (screenFlashEl) screenFlashEl.classList.remove('active-call', 'active-put');
 
@@ -2587,6 +2593,8 @@
     if (miniTakeBtn) miniTakeBtn.classList.add('al-btn-pulse');
     if (isCall && tmBuy) tmBuy.classList.add('al-btn-pulse');
     else if (!isCall && tmSell) tmSell.classList.add('al-btn-pulse');
+    if (isCall && dockBuy) dockBuy.classList.add('al-btn-pulse');
+    else if (!isCall && dockSell) dockSell.classList.add('al-btn-pulse');
     if (screenFlashEl) screenFlashEl.classList.add(isCall ? 'active-call' : 'active-put');
 
     signalFlashTimeout = setTimeout(() => {
@@ -2595,8 +2603,12 @@
       if (miniTakeBtn) miniTakeBtn.classList.remove('al-btn-pulse');
       const curBuy = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-buy') : null;
       const curSell = tmRootEl ? tmRootEl.querySelector('#al-tm-exec-sell') : null;
+      const curDockBuy = dockActionHostEl ? dockActionHostEl.querySelector('#al-dock-exec-buy') : null;
+      const curDockSell = dockActionHostEl ? dockActionHostEl.querySelector('#al-dock-exec-sell') : null;
       if (curBuy) curBuy.classList.remove('al-btn-pulse');
       if (curSell) curSell.classList.remove('al-btn-pulse');
+      if (curDockBuy) curDockBuy.classList.remove('al-btn-pulse');
+      if (curDockSell) curDockSell.classList.remove('al-btn-pulse');
       if (radarHero) radarHero.classList.remove('flash-call', 'flash-put');
       if (screenFlashEl) screenFlashEl.classList.remove('active-call', 'active-put');
       if (flashBar) flashBar.style.display = 'none';
@@ -3201,20 +3213,16 @@
     toolsUIState.isAudioPlaying = true;
     toolsUIState.activeAudioEvent = `${String(ev).toUpperCase()} (${String(style || 'sniper').toUpperCase()})`;
     if (audioVisTimeout) clearTimeout(audioVisTimeout);
-    if (tmRootEl && tmState.activeSubTab === 'tools') {
-      const visLbl = tmRootEl.querySelector('#al-tools-vis-lbl');
-      const visBars = tmRootEl.querySelector('#al-tools-vis-bars');
-      if (visLbl) visLbl.textContent = toolsUIState.activeAudioEvent;
-      if (visBars) visBars.classList.add('playing');
+    if (root) {
+      root.querySelectorAll('.al-tools-vis-lbl').forEach(el => { el.textContent = toolsUIState.activeAudioEvent; });
+      root.querySelectorAll('.al-tools-vis').forEach(el => { el.classList.add('playing'); });
     }
     audioVisTimeout = setTimeout(() => {
       toolsUIState.isAudioPlaying = false;
       toolsUIState.activeAudioEvent = '';
-      if (tmRootEl && tmState.activeSubTab === 'tools') {
-        const visLbl = tmRootEl.querySelector('#al-tools-vis-lbl');
-        const visBars = tmRootEl.querySelector('#al-tools-vis-bars');
-        if (visLbl) visLbl.textContent = 'READY';
-        if (visBars) visBars.classList.remove('playing');
+      if (root) {
+        root.querySelectorAll('.al-tools-vis-lbl').forEach(el => { el.textContent = 'READY'; });
+        root.querySelectorAll('.al-tools-vis').forEach(el => { el.classList.remove('playing'); });
       }
     }, 950);
   }
@@ -5208,6 +5216,7 @@
     if (activeTradeBox) activeTradeBox.style.display = 'none';
     syncFixedDockVisibility();
     renderTradeManager();
+    renderDockActions();
     updateLogsDisplay();
     savePersistedState();
   }
@@ -5230,15 +5239,24 @@
     if (activeTradeBox) activeTradeBox.style.display = 'none';
     syncFixedDockVisibility();
     renderTradeManager();
+    renderDockActions();
     updateLogsDisplay();
     savePersistedState();
   }
 
+  function isManagerTradeInlineActive() {
+    return !!(savedLayout.activeTab === 'manager' && tmState.activeSubTab === 'trade');
+  }
+
   function syncFixedDockVisibility() {
     if (!fixedDockEl) return;
-    const showActive = !!(activeTrade && activeTradeBox && activeTradeBox.style.display !== 'none');
+    const inlineMgr = isManagerTradeInlineActive();
+    const showActive = !!(activeTrade && activeTradeBox && activeTradeBox.style.display !== 'none' && !inlineMgr);
     const showNotify = !!(notifyBox && (notifyBox.classList.contains('success') || notifyBox.classList.contains('error')));
-    fixedDockEl.style.display = (showActive || showNotify) ? 'flex' : 'none';
+    const showActionHost = !!(dockActionHostEl && !inlineMgr && !activeTrade);
+    if (dockActionHostEl) dockActionHostEl.style.display = showActionHost ? 'block' : 'none';
+    if (activeTradeBox && inlineMgr) activeTradeBox.style.display = 'none';
+    fixedDockEl.style.display = (showActive || showNotify || showActionHost) ? 'flex' : 'none';
   }
 
   function updateActiveTradeTicker() {
@@ -5253,8 +5271,9 @@
       return;
     }
     const remSec = Math.ceil(remMs / 1000);
+    const inlineMgr = isManagerTradeInlineActive();
     if (activeTradeBox && activeTradeText && activeTradeCountdown) {
-      activeTradeBox.style.display = 'flex';
+      activeTradeBox.style.display = inlineMgr ? 'none' : 'flex';
       let statusTag = 'Live';
       let tagColor = '#38bdf8';
       if (activeTrade.entryPrice !== null && lastPrice !== null && isPriceCalibrated) {
@@ -5347,6 +5366,7 @@
       if (recentTrades.length > 30) recentTrades.pop();
       updateLogsDisplay();
       updateActiveTradeTicker();
+      renderDockActions();
       if (savedLayout.activeTab === 'manager') renderTradeManager();
       savePersistedState();
       showNotification(`Instant ${dirUpper === 'CALL' ? 'BUY' : 'SELL'} $${cleanStake} (${currentExpiry})`, 'success');
@@ -5416,6 +5436,7 @@
         const activeInTm = tmRootEl && document.activeElement && tmRootEl.contains(document.activeElement);
         if (savedLayout.activeTab === 'manager' && !activeInTm) renderTradeManager();
       }
+      renderDockActions();
     }
     if (detectedSrc) {
       scrapeSource = detectedSrc;
@@ -5438,6 +5459,7 @@
           else chip.classList.remove('active');
         });
       }
+      renderDockActions();
     }
 
     if (estProfitLbl && currentStake > 0) {
@@ -5467,6 +5489,7 @@
     }
 
     setPOAmount(currentStake);
+    renderDockActions();
     savePersistedState();
   }
 
@@ -5836,9 +5859,9 @@
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:5px;">
-              <div id="al-tools-vis-bars" class="al-tools-vis ${toolsUIState.isAudioPlaying ? 'playing' : ''}">
+              <div class="al-tools-vis ${toolsUIState.isAudioPlaying ? 'playing' : ''}">
                 <span></span><span></span><span></span><span></span>
-                <em id="al-tools-vis-lbl" style="font-style:normal;font-size:8px;font-family:monospace;color:#34d399;margin-left:3px;">${toolsUIState.activeAudioEvent || 'READY'}</em>
+                <em class="al-tools-vis-lbl" style="font-style:normal;font-size:8px;font-family:monospace;color:#34d399;margin-left:3px;">${toolsUIState.activeAudioEvent || 'READY'}</em>
               </div>
               <button data-tools-act="toggleSound" class="al-micro-btn" style="${toolsState.soundEnabled ? 'background:rgba(16,185,129,0.2);color:#34d399;border-color:#10b981;' : 'color:#94a3b8;'}">${toolsState.soundEnabled ? 'ON' : 'OFF'}</button>
             </div>
@@ -5846,7 +5869,7 @@
 
           <div style="display:flex;align-items:center;gap:7px;background:rgba(0,0,0,0.35);padding:5px 7px;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
             <span style="font-size:9px;font-weight:800;color:#94a3b8;white-space:nowrap;">VOL ${volPct}%</span>
-            <input id="al-tools-vol" type="range" min="0" max="100" value="${volPct}" style="flex:1;accent-color:#f59e0b;cursor:pointer;" />
+            <input class="al-tools-vol" type="range" min="0" max="100" value="${volPct}" style="flex:1;accent-color:#f59e0b;cursor:pointer;" />
             <button data-tools-act="toggleMute" class="al-micro-btn" style="${volPct === 0 ? 'color:#fb7185;border-color:rgba(244,63,94,0.45);' : ''}">${volPct === 0 ? 'UNMUTE' : 'MUTE'}</button>
           </div>
 
@@ -5949,7 +5972,7 @@
           </div>
           <div class="al-comp-field">
             <label><span>Webhook Endpoint URL</span></label>
-            <input id="al-tools-webhook" type="text" value="${escHtml(toolsState.webhookUrl)}" />
+            <input class="al-tools-webhook" type="text" value="${escHtml(toolsState.webhookUrl)}" />
           </div>
           <div class="al-comp-field">
             <label>
@@ -5959,7 +5982,7 @@
                 <button data-tools-act="copyApiKey" class="al-micro-btn" style="height:15px;font-size:8px;color:#67e8f9;">${toolsUIState.copiedKey ? 'Copied!' : 'Copy'}</button>
               </span>
             </label>
-            <input id="al-tools-apikey" type="${toolsUIState.showApiKey ? 'text' : 'password'}" value="${escHtml(toolsState.apiKey)}" />
+            <input class="al-tools-apikey" type="${toolsUIState.showApiKey ? 'text' : 'password'}" value="${escHtml(toolsState.apiKey)}" />
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
             <button data-tools-act="testPing" class="al-tm-btn-sec" style="color:#22d3ee;border-color:rgba(6,182,212,0.4);">Test Ping</button>
@@ -6002,6 +6025,91 @@
     `;
   }
 
+  const AL_SVG = {
+    trendUp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+    trendDown: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>',
+    arrowLR: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>',
+    checkCircle: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    alertTri: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+    copy: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+    check: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    settings: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+    fileText: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>',
+    calendar: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>',
+    sliders: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>',
+    layers: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    wrench: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    award: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>',
+    rotateCcw: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+    lamp: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 9l8 6 8-6-8-6Z" fill="rgba(56,189,248,0.22)"/><path d="M4 14l8 6 8-6"/></svg>'
+  };
+
+  function buildSniperActionControlHTML(stakeAmount, payoutPct, opts = {}) {
+    const isDock = !!opts.isDock;
+    const attrName = isDock ? 'data-dock-act' : 'data-tm-act';
+    const buyId = isDock ? 'al-dock-exec-buy' : 'al-tm-exec-buy';
+    const sellId = isDock ? 'al-dock-exec-sell' : 'al-tm-exec-sell';
+    const disabledBuySell = opts.disabledBuySell ? 'disabled' : '';
+    const disabledWinLoss = opts.disabledWinLoss ? 'disabled' : '';
+    const cleanStake = Number(stakeAmount) > 0 ? Number(stakeAmount) : 1;
+    const estWinProfit = (cleanStake * (Math.max(10, Number(payoutPct) || 92) / 100)).toFixed(2);
+    const padCls = isDock ? 'al-sniper-btn-dock' : 'al-sniper-btn-main';
+    const orbCls = isDock ? 'al-tm-switch-orb compact' : 'al-tm-switch-orb';
+
+    if (tmState.tradeActionMode === 'BUY_SELL') {
+      return `
+        <div class="al-sniper-action-row">
+          <button id="${buyId}" ${attrName}="execBuy" ${disabledBuySell} class="al-trade-btn al-btn-call ${padCls}">
+            ${AL_SVG.trendUp}
+            <span>BUY $${cleanStake.toFixed(2)}</span>
+          </button>
+          <button ${attrName}="toggleTradeMode" class="${orbCls} mode-buysell" title="Switch to WIN / LOSS">
+            <span class="al-orb-halo amber"></span>
+            <span class="al-orb-icon">${AL_SVG.arrowLR}</span>
+          </button>
+          <button id="${sellId}" ${attrName}="execSell" ${disabledBuySell} class="al-trade-btn al-btn-put ${padCls}">
+            ${AL_SVG.trendDown}
+            <span>SELL $${cleanStake.toFixed(2)}</span>
+          </button>
+        </div>
+      `;
+    }
+    return `
+      <div class="al-sniper-action-row">
+        <button ${attrName}="recWin" ${disabledWinLoss} class="al-trade-btn al-btn-call ${padCls}">
+          ${AL_SVG.checkCircle}
+          <span>WIN (+$${estWinProfit})</span>
+        </button>
+        <button ${attrName}="toggleTradeMode" class="${orbCls} mode-winloss" title="Switch to BUY / SELL">
+          <span class="al-orb-halo cyan"></span>
+          <span class="al-orb-icon">${AL_SVG.arrowLR}</span>
+        </button>
+        <button ${attrName}="recLoss" ${disabledWinLoss} class="al-trade-btn al-btn-put ${padCls}">
+          ${AL_SVG.alertTri}
+          <span>LOSS (-$${cleanStake.toFixed(2)})</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function renderDockActions() {
+    if (!dockActionHostEl) return;
+    const c = getTMComputed();
+    const stakeToUse = currentStake > 0 ? currentStake : c.nextStake;
+    const payToUse = currentPayout || tmState.payoutRate || 92;
+    dockActionHostEl.innerHTML = buildSniperActionControlHTML(stakeToUse, payToUse, {
+      isDock: true,
+      disabledBuySell: !tmState.sessionActive && false,
+      disabledWinLoss: !tmState.sessionActive || c.winsLeft === 0 || c.tradesRemaining === 0
+    });
+    syncFixedDockVisibility();
+  }
+
+  function renderStandaloneToolsTab() {
+    if (!toolsRootEl) return;
+    toolsRootEl.innerHTML = renderToolsTabHTML();
+  }
+
   function renderTradeManager() {
     if (!tmRootEl) return;
     const isFsMode = !!(card && card.classList.contains('fullscreen'));
@@ -6014,25 +6122,25 @@
     const topBar = `
       <div class="al-tm-card-head">
         <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:10.5px;font-weight:900;letter-spacing:1.2px;color:#f8fafc;">ALADDINSNIPER</span>
-          <span class="al-tag-sq" style="background:rgba(6,182,212,0.14);color:#22d3ee;border-color:rgba(6,182,212,0.4);">TRADE MANAGER</span>
+          <div style="width:20px;height:20px;border-radius:4px;background:rgba(14,165,233,0.14);border:1px solid rgba(56,189,248,0.45);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${AL_SVG.lamp}</div>
+          <span style="font-size:10.5px;font-weight:900;letter-spacing:1.3px;color:#f8fafc;">ALADDINSNIPER</span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button data-tm-act="toggleSync" class="al-tag-sq" style="cursor:pointer;${tmState.autoSyncPO ? 'background:rgba(16,185,129,0.16);color:#34d399;border-color:rgba(16,185,129,0.45);' : 'background:rgba(255,255,255,0.05);color:#94a3b8;border-color:rgba(255,255,255,0.12);'}" title="Auto-sync PO Balance, Payout &amp; Asset">PO ${tmState.autoSyncPO ? 'SYNCED' : 'MANUAL'}</button>
-          <span class="al-tag-sq" style="${poAccountType === 'REAL' ? 'background:rgba(16,185,129,0.15);color:#34d399;border-color:#10b981;' : 'background:rgba(245,158,11,0.15);color:#fbbf24;border-color:#f59e0b;'}">${poAccountType}</span>
+          <button data-tm-act="toggleSync" class="al-tag-sq" style="cursor:pointer;${tmState.autoSyncPO ? 'background:rgba(16,185,129,0.16);color:#34d399;border-color:rgba(16,185,129,0.45);' : 'background:rgba(255,255,255,0.05);color:#94a3b8;border-color:rgba(255,255,255,0.12);'}" title="Auto-sync PO Balance, Payout &amp; Asset">PO ${tmState.autoSyncPO ? 'SYNC' : 'MAN'}</button>
+          <span class="al-tag-sq" style="${poAccountType === 'REAL' ? 'background:rgba(16,185,129,0.15);color:#34d399;border-color:#10b981;box-shadow:0 0 8px rgba(16,185,129,0.22);' : 'background:rgba(245,158,11,0.15);color:#fbbf24;border-color:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,0.22);'}">${poAccountType}</span>
         </div>
       </div>
 
       <div class="al-tm-subtabs">
         ${[
-          { id: 'trade', label: 'Trade' },
-          { id: 'settings', label: 'Settings' },
-          { id: 'session_log', label: 'Log', fsOnly: true },
-          { id: 'calendar', label: 'P&L', fsOnly: true },
-          { id: 'schedule', label: 'Schedule' },
-          { id: 'matrix', label: 'Matrix' },
-          { id: 'tools', label: 'Tools' }
-        ].map(t => `<button data-tm-sub="${t.id}" class="al-tm-subtab ${t.fsOnly ? 'al-fs-only' : ''} ${tmState.activeSubTab === t.id ? 'active' : ''}">${t.label}</button>`).join('')}
+          { id: 'trade', label: 'Trade', icon: AL_SVG.trendUp },
+          { id: 'settings', label: 'Settings', icon: AL_SVG.settings },
+          { id: 'session_log', label: 'Log', icon: AL_SVG.fileText, fsOnly: true },
+          { id: 'calendar', label: 'P&L', icon: AL_SVG.calendar, fsOnly: true },
+          { id: 'schedule', label: 'Schedule', icon: AL_SVG.sliders },
+          { id: 'matrix', label: 'Matrix', icon: AL_SVG.layers },
+          { id: 'tools', label: 'Tools', icon: AL_SVG.wrench }
+        ].map(t => `<button data-tm-sub="${t.id}" class="al-tm-subtab ${t.fsOnly ? 'al-fs-only' : ''} ${tmState.activeSubTab === t.id ? 'active' : ''}">${t.icon}<span>${t.label}</span></button>`).join('')}
       </div>
     `;
 
@@ -6064,41 +6172,33 @@
       }).join('');
 
       const orderOrBtns = activeTrade ? `
-        <div class="al-tm-box" style="padding:8px;border-color:${activeTrade.direction === 'CALL' ? '#10b981' : '#f43f5e'};background:${activeTrade.direction === 'CALL' ? 'rgba(6,78,59,0.28)' : 'rgba(136,19,55,0.28)'};display:flex;flex-direction:column;gap:6px;">
+        <div class="al-tm-box" style="padding:8px;border-color:${activeTrade.direction === 'CALL' ? '#10b981' : '#f43f5e'};background:${activeTrade.direction === 'CALL' ? 'rgba(6,78,59,0.28)' : 'rgba(136,19,55,0.28)'};box-shadow:0 0 18px ${activeTrade.direction === 'CALL' ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'};display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span class="al-tag-sq" style="background:${activeTrade.direction === 'CALL' ? '#10b981' : '#f43f5e'};color:#000;font-weight:900;">${activeTrade.direction === 'CALL' ? 'BUY' : 'SELL'} • $${activeTrade.stake.toFixed(2)}</span>
+              <span class="al-tag-sq" style="background:${activeTrade.direction === 'CALL' ? '#10b981' : '#f43f5e'};color:${activeTrade.direction === 'CALL' ? '#000' : '#fff'};font-weight:900;">${activeTrade.direction === 'CALL' ? 'BUY' : 'SELL'} • $${activeTrade.stake.toFixed(2)}</span>
               <span style="font-size:10px;font-weight:700;color:#fff;font-family:monospace;">${escHtml(activeTrade.asset)}</span>
             </div>
-            <span id="al-tm-order-timer" class="al-tag-sq" style="background:rgba(0,0,0,0.65);border-color:rgba(245,158,11,0.5);color:#fcd34d;font-size:11px;font-weight:900;">${Math.max(0, Math.ceil((activeTrade.endTime - Date.now()) / 1000))}s</span>
+            <span id="al-tm-order-timer" class="al-tag-sq" style="background:rgba(0,0,0,0.7);border-color:rgba(245,158,11,0.55);color:#fcd34d;font-size:11px;font-weight:900;box-shadow:0 0 8px rgba(245,158,11,0.25);">${Math.max(0, Math.ceil((activeTrade.endTime - Date.now()) / 1000))}s</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:9.5px;font-family:monospace;color:#cbd5e1;">
             <span>Entry: <strong style="color:#fff;">${activeTrade.entryPrice ? formatPrice(activeTrade.entryPrice) : 'Live'}</strong></span>
             <span>Est: <strong style="color:#34d399;">+$${(activeTrade.stake * (tmState.payoutRate / 100)).toFixed(2)} (${tmState.payoutRate}%)</strong></span>
           </div>
           <div class="al-tm-grid2" style="gap:5px;">
-            <button data-tm-act="forceWin" class="al-trade-btn al-btn-call" style="padding:6px;font-size:10.5px;">Force WIN</button>
-            <button data-tm-act="forceLoss" class="al-trade-btn al-btn-put" style="padding:6px;font-size:10.5px;">Force LOSS</button>
+            <button data-tm-act="forceWin" class="al-trade-btn al-btn-call al-sniper-btn-dock">${AL_SVG.checkCircle}<span>Force WIN</span></button>
+            <button data-tm-act="forceLoss" class="al-trade-btn al-btn-put al-sniper-btn-dock">${AL_SVG.alertTri}<span>Force LOSS</span></button>
           </div>
         </div>
       ` : `
         <div style="display:flex;flex-direction:column;gap:6px;">
-          ${tmState.tradeActionMode === 'BUY_SELL' ? `
-            <div style="display:flex;align-items:center;gap:5px;">
-              <button id="al-tm-exec-buy" data-tm-act="execBuy" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-call" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▲ BUY $${nextStake.toFixed(2)}</button>
-              <button data-tm-act="toggleTradeMode" class="al-tm-switch-orb" style="border-color:rgba(245,158,11,0.8);color:#fcd34d;" title="Switch to WIN / LOSS">⇄</button>
-              <button id="al-tm-exec-sell" data-tm-act="execSell" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit) ? 'disabled' : ''} class="al-trade-btn al-btn-put" style="flex:1;padding:9px 6px;font-size:11.5px;border-radius:4px;">▼ SELL $${nextStake.toFixed(2)}</button>
-            </div>
-          ` : `
-            <div style="display:flex;align-items:center;gap:5px;">
-              <button data-tm-act="recWin" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0) ? 'disabled' : ''} class="al-trade-btn al-btn-call" style="flex:1;padding:9px 5px;font-size:11px;border-radius:4px;">WIN (+$${(nextStake * (tmState.payoutRate / 100)).toFixed(2)})</button>
-              <button data-tm-act="toggleTradeMode" class="al-tm-switch-orb" style="border-color:rgba(6,182,212,0.8);color:#67e8f9;" title="Switch to BUY / SELL">⇄</button>
-              <button data-tm-act="recLoss" ${(!tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0) ? 'disabled' : ''} class="al-trade-btn al-btn-put" style="flex:1;padding:9px 5px;font-size:11px;border-radius:4px;">LOSS (-$${nextStake.toFixed(2)})</button>
-            </div>
-          `}
+          ${buildSniperActionControlHTML(nextStake, tmState.payoutRate, {
+            isDock: false,
+            disabledBuySell: !tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0 || tmState.currentBalance < tmState.minStakeLimit,
+            disabledWinLoss: !tmState.sessionActive || winsLeft === 0 || tradesRemaining === 0
+          })}
           <div class="al-tm-grid2" style="gap:5px;">
-            <button data-tm-act="endSession" class="al-tm-btn-sec ${currentPL > 0 ? 'glow' : ''}">End ${currentPL > 0 ? `(+$${currentPL.toFixed(0)})` : 'Session'}</button>
-            <button data-tm-act="resetSession" class="al-tm-btn-sec" style="border-color:rgba(245,158,11,0.4);color:#fcd34d;">↺ Reset</button>
+            <button data-tm-act="endSession" class="al-tm-btn-sec ${currentPL > 0 ? 'glow' : ''}" style="display:flex;align-items:center;justify-content:center;gap:4px;">${AL_SVG.award}<span>End ${currentPL > 0 ? `(+$${currentPL.toFixed(0)})` : 'Session'}</span></button>
+            <button data-tm-act="resetSession" class="al-tm-btn-sec" style="border-color:rgba(245,158,11,0.4);color:#fcd34d;display:flex;align-items:center;justify-content:center;gap:4px;">${AL_SVG.rotateCcw}<span>Reset</span></button>
           </div>
         </div>
       `;
@@ -6136,7 +6236,7 @@
           <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
             <span style="font-size:28px;font-weight:900;font-family:monospace;color:#fff;letter-spacing:-0.5px;">$${nextStake.toFixed(2)}</span>
             <button data-tm-act="applyNextToPO" class="al-micro-btn" style="background:#0284c7;border-color:#38bdf8;color:#fff;height:22px;" title="Push stake into Pocket Option">→ PO</button>
-            <button data-tm-act="copyStake" class="al-micro-btn" style="height:22px;" title="Copy stake">Copy</button>
+            <button data-tm-act="copyStake" class="al-micro-btn" style="height:22px;display:inline-flex;align-items:center;gap:3px;" title="Copy stake to clipboard">${tmCopyFeedback ? AL_SVG.check : AL_SVG.copy}</button>
           </div>
           <div style="margin-top:4px;">${stageBadge}</div>
         </div>
@@ -6172,10 +6272,12 @@
           </div>
         ` : ''}
 
-        <div style="display:flex;gap:5px;">
-          <button data-tm-sub="session_log" class="al-tm-btn-sec al-fs-only" style="flex:1;color:#fbbf24;border-color:rgba(245,158,11,0.35);">Log</button>
-          <button data-tm-sub="matrix" class="al-tm-btn-sec" style="flex:1;color:#22d3ee;border-color:rgba(6,182,212,0.35);">Matrix</button>
-          <button data-tm-sub="schedule" class="al-tm-btn-sec" style="flex:1;color:#34d399;border-color:rgba(16,185,129,0.35);">Schedule</button>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+          <button data-tm-sub="session_log" class="al-tm-btn-sec al-fs-only" style="flex:1;min-width:58px;color:#fbbf24;border-color:rgba(245,158,11,0.38);align-items:center;justify-content:center;gap:3px;">${AL_SVG.fileText}<span>Log</span></button>
+          <button data-tm-sub="calendar" class="al-tm-btn-sec al-fs-only" style="flex:1;min-width:58px;color:#34d399;border-color:rgba(16,185,129,0.38);align-items:center;justify-content:center;gap:3px;">${AL_SVG.calendar}<span>P&amp;L</span></button>
+          <button data-tm-sub="matrix" class="al-tm-btn-sec" style="flex:1;min-width:62px;color:#22d3ee;border-color:rgba(6,182,212,0.35);display:inline-flex;align-items:center;justify-content:center;gap:3px;">${AL_SVG.layers}<span>Matrix</span></button>
+          <button data-tm-sub="schedule" class="al-tm-btn-sec" style="flex:1;min-width:68px;color:#34d399;border-color:rgba(16,185,129,0.35);display:inline-flex;align-items:center;justify-content:center;gap:3px;">${AL_SVG.sliders}<span>Schedule</span></button>
+          <button data-tm-sub="tools" class="al-tm-btn-sec" style="flex:1;min-width:58px;color:#fbbf24;border-color:rgba(245,158,11,0.35);display:inline-flex;align-items:center;justify-content:center;gap:3px;">${AL_SVG.wrench}<span>Tools</span></button>
         </div>
 
         ${orderOrBtns}
@@ -6481,6 +6583,9 @@
         drawMatrixCanvasChart(mxCanvas, res.rows, mxState.activeMode);
       }
     }
+
+    renderDockActions();
+    syncFixedDockVisibility();
   }
 
   // -------------------------------------------------------------------------
@@ -7185,21 +7290,18 @@
         .al-ctrl-btn:hover { background: rgba(51, 65, 85, 0.9); color: #ffffff; }
 
         .al-nav-tabs {
-          display: flex; background: rgba(15, 23, 42, 0.92);
+          display: flex; flex-wrap: wrap; background: rgba(15, 23, 42, 0.92);
           border-bottom: 1px solid rgba(148, 163, 184, 0.12); flex-shrink: 0;
-          padding: 0 4px; overflow-x: auto; -webkit-overflow-scrolling: touch;
-          touch-action: pan-x; scrollbar-width: thin;
-          gap: 2px;
+          padding: 3px 4px; gap: 2px;
         }
-        .al-nav-tabs::-webkit-scrollbar { height: 2px; }
         .al-nav-tab {
-          flex: 1 0 auto; min-width: 52px; padding: 7px 7px; font-size: 10px; font-weight: 600; color: #94a3b8;
-          background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;
-          white-space: nowrap; text-align: center; transition: color 0.15s, border-color 0.15s;
-          touch-action: manipulation;
+          flex: 1 0 auto; min-width: auto; padding: 5px 6px; font-size: 9.5px; font-weight: 700; color: #94a3b8;
+          background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; cursor: pointer;
+          white-space: nowrap; text-align: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
+          touch-action: manipulation; display: inline-flex; align-items: center; justify-content: center; gap: 3px;
         }
-        .al-nav-tab:hover { color: #e2e8f0; }
-        .al-nav-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+        .al-nav-tab:hover { color: #e2e8f0; background: rgba(255, 255, 255, 0.03); }
+        .al-nav-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
 
         #aladdin-card.al-signal-cam {
           background: transparent !important;
@@ -7212,6 +7314,12 @@
           background: transparent !important;
           padding: 0;
           gap: 0;
+        }
+        #aladdin-card.al-signal-cam .al-fixed-dock {
+          background: rgba(11, 15, 25, 0.78);
+          backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+          border-top: 1px solid rgba(56, 189, 248, 0.24);
+          padding: 5px 7px;
         }
         #aladdin-card.al-signal-cam #al-pane-radar.active {
           min-height: 100%;
@@ -7229,17 +7337,17 @@
           flex: 0 0 auto;
         }
         .al-chart-window {
-          height: auto; min-height: 290px; flex: 1 0 290px;
+          height: auto; min-height: 245px; flex: 1 0 245px;
           background: transparent !important;
           backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
           position: relative; pointer-events: auto; touch-action: pan-x pan-y; overflow: hidden;
           box-shadow: inset 0 10px 18px -12px rgba(2, 6, 23, 0.72), inset 0 -10px 18px -12px rgba(2, 6, 23, 0.72);
         }
         #aladdin-card.fullscreen.al-signal-cam .al-chart-window {
-          height: calc(100vh - 125px);
-          height: calc(100dvh - 125px);
-          min-height: calc(100vh - 125px);
-          min-height: calc(100dvh - 125px);
+          height: calc(100vh - 175px);
+          height: calc(100dvh - 175px);
+          min-height: calc(100vh - 175px);
+          min-height: calc(100dvh - 175px);
           flex: 0 0 auto;
         }
         .al-cam-corner {
@@ -7417,14 +7525,44 @@
         }
         .al-tm-step-mini:hover { background: rgba(245,158,11,0.22); color: #fbbf24; border-color: rgba(245,158,11,0.45); }
         .al-trade-btn {
-          padding: 10px 6px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;
-          border: none; display: flex; align-items: center; justify-content: center; gap: 5px;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.45); letter-spacing: 0.2px; transition: transform 0.08s;
+          padding: 9px 6px; border-radius: 5px; font-weight: 800; font-size: 11.5px; cursor: pointer;
+          border: 1px solid transparent; display: flex; align-items: center; justify-content: center; gap: 5px;
+          letter-spacing: 0.25px; transition: transform 0.1s, filter 0.15s, box-shadow 0.15s;
           touch-action: manipulation;
         }
-        .al-trade-btn:active { transform: scale(0.97); }
-        .al-btn-call { background: linear-gradient(135deg, #059669, #10b981); color: #ffffff; }
-        .al-btn-put { background: linear-gradient(135deg, #e11d48, #f43f5e); color: #ffffff; }
+        .al-trade-btn:hover:not(:disabled) { filter: brightness(1.08); }
+        .al-trade-btn:active:not(:disabled) { transform: scale(0.97); }
+        .al-btn-call {
+          background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+          border: 1px solid rgba(110, 231, 183, 0.48);
+          color: #ffffff;
+          box-shadow: 0 4px 16px rgba(16, 185, 129, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        }
+        .al-btn-put {
+          background: linear-gradient(180deg, #f43f5e 0%, #e11d48 100%);
+          border: 1px solid rgba(253, 164, 175, 0.45);
+          color: #ffffff;
+          box-shadow: 0 4px 16px rgba(244, 63, 94, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .al-sniper-action-row {
+          display: flex; align-items: center; gap: 6px; width: 100%;
+        }
+        .al-sniper-btn-main {
+          flex: 1; padding: 10px 6px; border-radius: 5px; font-size: 11.5px; font-weight: 900;
+          letter-spacing: 0.3px; min-width: 0; white-space: nowrap;
+        }
+        .al-sniper-btn-dock {
+          flex: 1; padding: 8px 5px; border-radius: 5px; font-size: 11px; font-weight: 900;
+          letter-spacing: 0.25px; min-width: 0; white-space: nowrap;
+        }
+        .al-sniper-btn-main:disabled, .al-sniper-btn-dock:disabled {
+          opacity: 0.42; cursor: not-allowed; filter: grayscale(0.4);
+        }
+        @keyframes alOrbHaloPulse {
+          0%, 100% { transform: scale(1); opacity: 0.55; }
+          50% { transform: scale(1.16); opacity: 0.95; }
+        }
 
         .al-radar-hero {
           background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
@@ -7471,18 +7609,17 @@
           font-size: 8.5px; font-weight: 800; font-family: monospace; white-space: nowrap;
         }
         .al-tm-subtabs {
-          display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+          display: flex; flex-wrap: wrap; gap: 1px;
           background: #0c1017; border: 1px solid #1b2233; border-top: none; margin-bottom: 2px;
-          scrollbar-width: thin;
         }
-        .al-tm-subtabs::-webkit-scrollbar { height: 2px; }
         .al-tm-subtab {
-          flex: 1 0 auto; padding: 6px 8px; background: transparent; border: none; border-bottom: 2px solid transparent;
-          color: #94a3b8; font-size: 10px; font-weight: 800; cursor: pointer; white-space: nowrap;
-          touch-action: manipulation; transition: color 0.15s, border-color 0.15s;
+          flex: 1 1 auto; padding: 5px 6px; background: transparent; border: none; border-bottom: 2px solid transparent;
+          color: #94a3b8; font-size: 9.5px; font-weight: 800; cursor: pointer; white-space: nowrap;
+          touch-action: manipulation; transition: color 0.15s, border-color 0.15s, background 0.15s;
+          display: inline-flex; align-items: center; justify-content: center; gap: 4px;
         }
-        .al-tm-subtab:hover { color: #e2e8f0; }
-        .al-tm-subtab.active { color: #f59e0b; border-bottom-color: #f59e0b; }
+        .al-tm-subtab:hover { color: #e2e8f0; background: rgba(255, 255, 255, 0.03); }
+        .al-tm-subtab.active { color: #f59e0b; border-bottom-color: #f59e0b; background: rgba(245, 158, 11, 0.07); }
         .al-tm-box {
           background: #10141e; border: 1px solid #1b2233; border-radius: 4px;
         }
@@ -7512,9 +7649,36 @@
         .al-tm-kpi6-row:last-child { border-bottom: none; }
         .al-tm-kpi6-row > div:first-child { border-right: 1px solid #1b2233; padding-right: 6px; }
         .al-tm-switch-orb {
-          width: 34px; height: 34px; border-radius: 50%; background: #101624; border: 2px solid;
-          font-size: 14px; font-weight: 900; cursor: pointer; flex-shrink: 0;
+          position: relative; width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+          background: linear-gradient(180deg, #1c2438 0%, #101624 55%, #0a0e18 100%);
+          border: 2px solid rgba(245, 158, 11, 0.72);
+          color: #fbbf24; cursor: pointer;
           display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.16);
+          transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s, box-shadow 0.2s, color 0.2s;
+        }
+        .al-tm-switch-orb.compact { width: 34px; height: 34px; }
+        .al-tm-switch-orb.mode-buysell {
+          border-color: rgba(245, 158, 11, 0.72); color: #fbbf24;
+          box-shadow: 0 0 16px rgba(245, 158, 11, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.18);
+        }
+        .al-tm-switch-orb.mode-winloss {
+          border-color: rgba(34, 211, 238, 0.78); color: #67e8f9;
+          box-shadow: 0 0 16px rgba(6, 182, 212, 0.36), inset 0 1px 1px rgba(255, 255, 255, 0.18);
+        }
+        .al-tm-switch-orb:hover { transform: scale(1.06); }
+        .al-tm-switch-orb:hover .al-orb-icon { transform: rotate(180deg); }
+        .al-tm-switch-orb:active { transform: scale(0.92); }
+        .al-orb-halo {
+          position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+          border: 1.5px solid rgba(245, 158, 11, 0.38);
+          animation: alOrbHaloPulse 2.2s ease-in-out infinite;
+        }
+        .al-orb-halo.cyan { border-color: rgba(34, 211, 238, 0.42); }
+        .al-orb-icon {
+          display: inline-flex; align-items: center; justify-content: center;
+          transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+          position: relative; z-index: 1;
         }
         .al-tm-btn-sec {
           padding: 6px 8px; border-radius: 4px; background: #141924;
@@ -7634,7 +7798,10 @@
           <button class="al-nav-tab" data-tab="manager">Manager</button>
           <button class="al-nav-tab" data-tab="challenges">333/444</button>
           <button class="al-nav-tab" data-tab="paradox">Paradox</button>
+          <button class="al-nav-tab" data-tab="tools">Tools</button>
           <button class="al-nav-tab" data-tab="logs">Logs</button>
+          <button class="al-nav-tab al-fs-only" data-fs-jump="session_log" title="Session Log (Fullscreen)">S.Log</button>
+          <button class="al-nav-tab al-fs-only" data-fs-jump="calendar" title="P&amp;L Calendar (Fullscreen)">P&amp;L</button>
         </div>
 
         <div class="al-scroll-body">
@@ -7802,7 +7969,12 @@
             <div id="al-px-root" style="display:flex;flex-direction:column;gap:7px;"></div>
           </div>
 
-          <!-- TAB 4: LOGS -->
+          <!-- TAB 6: DEDICATED TOOLS FOLDER (AUDIO, THEMES, WEBHOOK, EXPORT) -->
+          <div class="al-tab-pane" id="al-pane-tools">
+            <div id="al-tools-root" style="display:flex;flex-direction:column;gap:7px;"></div>
+          </div>
+
+          <!-- TAB 7: LOGS -->
           <div class="al-tab-pane" id="al-pane-logs">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <strong style="color: #cbd5e1; font-size: 10.5px;">Execution History</strong>
@@ -7812,8 +7984,9 @@
           </div>
         </div>
 
-        <!-- FIXED COLLAPSIBLE STATUS & NOTIFICATION DOCK -->
+        <!-- FIXED UNIVERSAL SNIPER ACTION & STATUS DOCK -->
         <div class="al-fixed-dock">
+          <div id="al-dock-action-host"></div>
           <div class="al-active-trade-box" id="al-active-trade-box">
             <span id="al-active-trade-text">▲ BUY $1.11 · Live</span>
             <span id="al-active-trade-countdown" style="background: rgba(2,6,23,0.85); padding: 2px 6px; border-radius: 5px; border: 1px solid currentColor;">15s</span>
@@ -7876,6 +8049,8 @@
     tmRootEl = root.querySelector('#al-tm-root');
     chRootEl = root.querySelector('#al-ch-root');
     pxRootEl = root.querySelector('#al-px-root');
+    toolsRootEl = root.querySelector('#al-tools-root');
+    dockActionHostEl = root.querySelector('#al-dock-action-host');
     dockAutoTag = null;
 
     radarCandleTime = root.querySelector('#al-radar-candle-time');
@@ -7901,13 +8076,14 @@
     orderLogsList = root.querySelector('#al-order-logs-list');
     const clearLogsBtn = root.querySelector('#al-clear-logs-btn');
 
-    const validTabs = ['sniper', 'radar', 'manager', 'challenges', 'paradox', 'logs'];
+    const validTabs = ['sniper', 'radar', 'manager', 'challenges', 'paradox', 'tools', 'logs'];
     const initTab = validTabs.includes(savedLayout.activeTab) ? savedLayout.activeTab : 'sniper';
     savedLayout.activeTab = initTab;
     navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === initTab));
     tabPanes.forEach(p => p.classList.toggle('active', p.id === `al-pane-${initTab}`));
     card.classList.toggle('al-signal-cam', initTab === 'radar');
     applyGenieTheme(toolsState.currentTheme);
+    renderDockActions();
     syncFixedDockVisibility();
 
     if (signalModeBtns) {
@@ -7933,6 +8109,7 @@
         toolsState.soundEnabled = audioEnabled;
         audioToggleBtn.textContent = audioEnabled ? '🔊' : '🔇';
         savePersistedState();
+        renderStandaloneToolsTab();
         if (savedLayout.activeTab === 'manager' && tmState.activeSubTab === 'tools') renderTradeManager();
       });
     }
@@ -7979,6 +8156,11 @@
           }
           playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
           tmState.activeSubTab = targetSub;
+          if (isFs && (targetSub === 'session_log' || targetSub === 'calendar')) {
+            navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-fs-jump') === targetSub));
+          } else {
+            navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === savedLayout.activeTab));
+          }
           savePersistedState();
           renderTradeManager();
           return;
@@ -8097,7 +8279,11 @@
             if (navigator.clipboard && navigator.clipboard.writeText) {
               navigator.clipboard.writeText(s).catch(() => {});
             }
+            tmCopyFeedback = true;
+            if (tmCopyTimer) clearTimeout(tmCopyTimer);
+            tmCopyTimer = setTimeout(() => { tmCopyFeedback = false; renderTradeManager(); }, 1500);
             applyStake(parseFloat(s), false);
+            renderTradeManager();
             showNotification(`Copied & Synced $${s}`, 'success');
           } else if (act === 'forceWin') {
             forceSettleActiveTrade(true);
@@ -8251,198 +8437,8 @@
           return;
         }
 
-        // Tools Sub-Tab Delegated Handlers
-        const toolsPackBtn = e.target.closest('[data-tools-pack]');
-        if (toolsPackBtn) {
-          toolsState.toneStyle = toolsPackBtn.getAttribute('data-tools-pack') || 'sniper';
-          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-          savePersistedState();
-          renderTradeManager();
-          return;
-        }
-        const toolsAudBtn = e.target.closest('[data-tools-audition]');
-        if (toolsAudBtn) {
-          const pk = toolsAudBtn.getAttribute('data-tools-audition') || 'sniper';
-          playSoundEffect('streak', toolsState.soundVolume, pk);
-          return;
-        }
-        const toolsCatBtn = e.target.closest('[data-tools-cat]');
-        if (toolsCatBtn) {
-          const cat = toolsCatBtn.getAttribute('data-tools-cat');
-          if (cat) {
-            toolsState.soundCategories[cat] = !(toolsState.soundCategories[cat] !== false);
-            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-            savePersistedState();
-            renderTradeManager();
-          }
-          return;
-        }
-        const toolsVlangBtn = e.target.closest('[data-tools-vlang]');
-        if (toolsVlangBtn) {
-          toolsState.voiceLanguage = toolsVlangBtn.getAttribute('data-tools-vlang') === 'Hindi' ? 'Hindi' : 'English';
-          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-          savePersistedState();
-          renderTradeManager();
-          return;
-        }
-        const toolsThemeBtn = e.target.closest('[data-tools-theme]');
-        if (toolsThemeBtn) {
-          const th = toolsThemeBtn.getAttribute('data-tools-theme') || 'sniper';
-          applyGenieTheme(th);
-          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-          savePersistedState();
-          renderTradeManager();
-          return;
-        }
-        const toolsActBtn = e.target.closest('[data-tools-act]');
-        if (toolsActBtn) {
-          const act = toolsActBtn.getAttribute('data-tools-act');
-          if (act === 'toggleSound') {
-            toolsState.soundEnabled = !toolsState.soundEnabled;
-            audioEnabled = toolsState.soundEnabled;
-            if (audioToggleBtn) audioToggleBtn.textContent = audioEnabled ? '🔊' : '🔇';
-            if (toolsState.soundEnabled) playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-            savePersistedState();
-            renderTradeManager();
-          } else if (act === 'toggleMute') {
-            if (toolsState.soundVolume > 0) {
-              toolsState._prevVol = toolsState.soundVolume;
-              toolsState.soundVolume = 0;
-            } else {
-              toolsState.soundVolume = toolsState._prevVol || 0.85;
-              playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-            }
-            savePersistedState();
-            renderTradeManager();
-          } else if (act === 'testWin') {
-            playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testStreak') {
-            playSoundEffect('streak', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testTarget') {
-            playSoundEffect('target', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testSignal') {
-            playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testLoss') {
-            playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testStage') {
-            playSoundEffect('stage', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testCountdown') {
-            playSoundEffect('countdown', toolsState.soundVolume, toolsState.toneStyle);
-          } else if (act === 'testFireworks') {
-            const vid = CELEBRATION_VARIANT_CYCLE[toolsUIState.fireworksThemeIdx % CELEBRATION_VARIANT_CYCLE.length];
-            toolsUIState.fireworksThemeIdx += 1;
-            const w = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
-            const l = tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
-            const tot = w + l;
-            openFireworksOverlay({
-              variant: vid,
-              title: 'TARGET ACHIEVED',
-              winProfit: Math.max(0, getTMComputed().planMetrics.targetProfit || 142.50),
-              winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
-              currentBalance: tmState.currentBalance,
-              startBalance: tmState.sessionStartBalance,
-              winsCount: w || tmState.winsNeeded,
-              lossesCount: l,
-              assetName: poAsset || tmState.selectedAsset
-            });
-          } else if (act === 'toggleVoice') {
-            toolsState.voiceAnnounceEnabled = !toolsState.voiceAnnounceEnabled;
-            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-            savePersistedState();
-            renderTradeManager();
-          } else if (act === 'testVoice') {
-            const msg = toolsState.voiceLanguage === 'Hindi'
-              ? 'अलादीन स्नाइपर प्रो सक्रिय है। अगला ट्रेड सिग्नल तैयार है।'
-              : 'AladdinSniper Pro voice active. Next trade signal ready.';
-            speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume);
-          } else if (act === 'toggleApiKey') {
-            toolsUIState.showApiKey = !toolsUIState.showApiKey;
-            renderTradeManager();
-          } else if (act === 'copyApiKey') {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(toolsState.apiKey).catch(() => {});
-            }
-            toolsUIState.copiedKey = true;
-            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
-            renderTradeManager();
-            setTimeout(() => { toolsUIState.copiedKey = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
-          } else if (act === 'testPing') {
-            toolsUIState.pingStatus = 'testing';
-            renderTradeManager();
-            const t0 = Date.now();
-            setTimeout(() => {
-              toolsUIState.pingStatus = 'success';
-              toolsUIState.pingLatency = Math.max(18, Math.min(84, (Date.now() - t0) % 70 + 22));
-              playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
-              if (tmState.activeSubTab === 'tools') renderTradeManager();
-            }, 380);
-          } else if (act === 'togglePayload') {
-            toolsUIState.showPayloadModal = !toolsUIState.showPayloadModal;
-            renderTradeManager();
-          } else if (act === 'saveWebhook') {
-            savePersistedState();
-            toolsUIState.saveFeedback = true;
-            playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
-            renderTradeManager();
-            setTimeout(() => { toolsUIState.saveFeedback = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
-          } else if (act === 'exportCSV') {
-            const rows = [['Date', 'Start Bal', 'Trades', 'Wins Needed', 'Payout %', 'Goal', 'Ending Bal', 'Won', 'Lost', 'P/L']];
-            tmState.sessionLogs.forEach(x => {
-              rows.push([x.dateFormatted, x.accountBalance, x.tradesAllowed, x.winsNeeded, x.payoutRate, x.capitalGoal, x.endingBalance, x.won, x.lost, x.profitOrLoss]);
-            });
-            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `aladdinsniper_sessions_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1500);
-            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
-            toolsUIState.exportNotice = `Exported ${tmState.sessionLogs.length} sessions to CSV`;
-            renderTradeManager();
-          } else if (act === 'exportJSON') {
-            const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), sessionLogs: tmState.sessionLogs, toolsState }, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `aladdinsniper_backup_${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1500);
-            playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
-            toolsUIState.exportNotice = `Exported JSON backup (${tmState.sessionLogs.length} sessions)`;
-            renderTradeManager();
-          } else if (act === 'askClearLogs') {
-            toolsUIState.confirmClearLogs = true;
-            renderTradeManager();
-          } else if (act === 'confirmClearLogs') {
-            tmState.sessionLogs = [];
-            toolsUIState.confirmClearLogs = false;
-            toolsUIState.exportNotice = 'All session history cleared';
-            playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
-            savePersistedState();
-            renderTradeManager();
-          } else if (act === 'cancelClearLogs') {
-            toolsUIState.confirmClearLogs = false;
-            renderTradeManager();
-          } else if (act === 'resetDefaults') {
-            toolsState = {
-              soundEnabled: true, soundVolume: 0.85, toneStyle: 'sniper',
-              soundCategories: { signals: true, wins: true, losses: true, milestones: true, clicks: true, countdown: true },
-              voiceLanguage: 'English', voiceAnnounceEnabled: true, currentTheme: 'dark',
-              fireworksVariant: 'golden_royal',
-              webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
-              apiKey: 'pk_live_aladdin_sniper_92'
-            };
-            audioEnabled = true;
-            if (audioToggleBtn) audioToggleBtn.textContent = '🔊';
-            applyGenieTheme('dark');
-            toolsUIState.resetFeedback = true;
-            playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
-            savePersistedState();
-            renderTradeManager();
-            setTimeout(() => { toolsUIState.resetFeedback = false; if (tmState.activeSubTab === 'tools') renderTradeManager(); }, 1800);
-          }
-          return;
-        }
+        // Delegate Tools clicks inside Manager -> Tools to shared handler
+        if (handleToolsClick(e)) return;
 
         // Matrix Sub-Tab Buttons
         const mxModeBtn = e.target.closest('[data-mx-mode]');
@@ -8622,26 +8618,274 @@
           if (shouldRerender) renderTradeManager();
           return;
         }
-        if (id === 'al-tools-vol') {
-          const pct = Math.max(0, Math.min(100, parseInt(el.value, 10) || 0));
-          toolsState.soundVolume = pct / 100;
-          savePersistedState();
-          if (shouldRerender) renderTradeManager();
-          return;
-        }
-        if (id === 'al-tools-webhook') {
-          toolsState.webhookUrl = el.value;
-          savePersistedState();
-          return;
-        }
-        if (id === 'al-tools-apikey') {
-          toolsState.apiKey = el.value;
-          savePersistedState();
-        }
+        handleToolsFieldUpdate(e, shouldRerender);
       };
 
       tmRootEl.addEventListener('input', (e) => handleTMFieldUpdate(e, false));
       tmRootEl.addEventListener('change', (e) => handleTMFieldUpdate(e, true));
+    }
+
+    // -----------------------------------------------------------------------
+    // SHARED TOOLS TAB HANDLERS (#al-tools-root & Manager -> Tools)
+    // -----------------------------------------------------------------------
+    function syncAllToolsUIs() {
+      renderStandaloneToolsTab();
+      if (savedLayout.activeTab === 'manager' && tmState.activeSubTab === 'tools') {
+        renderTradeManager();
+      }
+    }
+
+    function handleToolsClick(e) {
+      const toolsPackBtn = e.target.closest('[data-tools-pack]');
+      if (toolsPackBtn) {
+        toolsState.toneStyle = toolsPackBtn.getAttribute('data-tools-pack') || 'sniper';
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+        return true;
+      }
+      const toolsAudBtn = e.target.closest('[data-tools-audition]');
+      if (toolsAudBtn) {
+        const pk = toolsAudBtn.getAttribute('data-tools-audition') || 'sniper';
+        playSoundEffect('streak', toolsState.soundVolume, pk);
+        return true;
+      }
+      const toolsCatBtn = e.target.closest('[data-tools-cat]');
+      if (toolsCatBtn) {
+        const cat = toolsCatBtn.getAttribute('data-tools-cat');
+        if (cat) {
+          toolsState.soundCategories[cat] = !(toolsState.soundCategories[cat] !== false);
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          savePersistedState();
+          syncAllToolsUIs();
+        }
+        return true;
+      }
+      const toolsVlangBtn = e.target.closest('[data-tools-vlang]');
+      if (toolsVlangBtn) {
+        toolsState.voiceLanguage = toolsVlangBtn.getAttribute('data-tools-vlang') === 'Hindi' ? 'Hindi' : 'English';
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+        return true;
+      }
+      const toolsThemeBtn = e.target.closest('[data-tools-theme]');
+      if (toolsThemeBtn) {
+        const th = toolsThemeBtn.getAttribute('data-tools-theme') || 'sniper';
+        applyGenieTheme(th);
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+        return true;
+      }
+      const toolsActBtn = e.target.closest('[data-tools-act]');
+      if (!toolsActBtn) return false;
+
+      const act = toolsActBtn.getAttribute('data-tools-act');
+      if (act === 'toggleSound') {
+        toolsState.soundEnabled = !toolsState.soundEnabled;
+        audioEnabled = toolsState.soundEnabled;
+        if (audioToggleBtn) audioToggleBtn.textContent = audioEnabled ? '🔊' : '🔇';
+        if (toolsState.soundEnabled) playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+      } else if (act === 'toggleMute') {
+        if (toolsState.soundVolume > 0) {
+          toolsState._prevVol = toolsState.soundVolume;
+          toolsState.soundVolume = 0;
+        } else {
+          toolsState.soundVolume = toolsState._prevVol || 0.85;
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        }
+        savePersistedState();
+        syncAllToolsUIs();
+      } else if (act === 'testWin') {
+        playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testStreak') {
+        playSoundEffect('streak', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testTarget') {
+        playSoundEffect('target', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testSignal') {
+        playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testLoss') {
+        playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testStage') {
+        playSoundEffect('stage', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testCountdown') {
+        playSoundEffect('countdown', toolsState.soundVolume, toolsState.toneStyle);
+      } else if (act === 'testFireworks') {
+        const vid = CELEBRATION_VARIANT_CYCLE[toolsUIState.fireworksThemeIdx % CELEBRATION_VARIANT_CYCLE.length];
+        toolsUIState.fireworksThemeIdx += 1;
+        const w = tmState.sessionTrades.filter(t => t.result === 'WIN').length;
+        const l = tmState.sessionTrades.filter(t => t.result === 'LOSS').length;
+        const tot = w + l;
+        openFireworksOverlay({
+          variant: vid,
+          title: 'TARGET ACHIEVED',
+          winProfit: Math.max(0, getTMComputed().planMetrics.targetProfit || 142.50),
+          winRate: tot > 0 ? Math.round((w / tot) * 100) : 100,
+          currentBalance: tmState.currentBalance,
+          startBalance: tmState.sessionStartBalance,
+          winsCount: w || tmState.winsNeeded,
+          lossesCount: l,
+          assetName: poAsset || tmState.selectedAsset
+        });
+      } else if (act === 'toggleVoice') {
+        toolsState.voiceAnnounceEnabled = !toolsState.voiceAnnounceEnabled;
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+      } else if (act === 'testVoice') {
+        const msg = toolsState.voiceLanguage === 'Hindi'
+          ? 'अलादीन स्नाइपर प्रो सक्रिय है। अगला ट्रेड सिग्नल तैयार है।'
+          : 'AladdinSniper Pro voice active. Next trade signal ready.';
+        speakVoiceNotification(msg, toolsState.voiceLanguage, toolsState.soundVolume);
+      } else if (act === 'toggleApiKey') {
+        toolsUIState.showApiKey = !toolsUIState.showApiKey;
+        syncAllToolsUIs();
+      } else if (act === 'copyApiKey') {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(toolsState.apiKey).catch(() => {});
+        }
+        toolsUIState.copiedKey = true;
+        playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+        syncAllToolsUIs();
+        setTimeout(() => { toolsUIState.copiedKey = false; syncAllToolsUIs(); }, 1800);
+      } else if (act === 'testPing') {
+        toolsUIState.pingStatus = 'testing';
+        syncAllToolsUIs();
+        const t0 = Date.now();
+        setTimeout(() => {
+          toolsUIState.pingStatus = 'success';
+          toolsUIState.pingLatency = Math.max(18, Math.min(84, (Date.now() - t0) % 70 + 22));
+          playSoundEffect('signal', toolsState.soundVolume, toolsState.toneStyle);
+          syncAllToolsUIs();
+        }, 380);
+      } else if (act === 'togglePayload') {
+        toolsUIState.showPayloadModal = !toolsUIState.showPayloadModal;
+        syncAllToolsUIs();
+      } else if (act === 'saveWebhook') {
+        savePersistedState();
+        toolsUIState.saveFeedback = true;
+        playSoundEffect('win', toolsState.soundVolume, toolsState.toneStyle);
+        syncAllToolsUIs();
+        setTimeout(() => { toolsUIState.saveFeedback = false; syncAllToolsUIs(); }, 1800);
+      } else if (act === 'exportCSV') {
+        const rows = [['Date', 'Start Bal', 'Trades', 'Wins Needed', 'Payout %', 'Goal', 'Ending Bal', 'Won', 'Lost', 'P/L']];
+        tmState.sessionLogs.forEach(x => {
+          rows.push([x.dateFormatted, x.accountBalance, x.tradesAllowed, x.winsNeeded, x.payoutRate, x.capitalGoal, x.endingBalance, x.won, x.lost, x.profitOrLoss]);
+        });
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `aladdinsniper_sessions_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+        toolsUIState.exportNotice = `Exported ${tmState.sessionLogs.length} sessions to CSV`;
+        syncAllToolsUIs();
+      } else if (act === 'exportJSON') {
+        const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), sessionLogs: tmState.sessionLogs, toolsState }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `aladdinsniper_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        playSoundEffect('copy', toolsState.soundVolume, toolsState.toneStyle);
+        toolsUIState.exportNotice = `Exported JSON backup (${tmState.sessionLogs.length} sessions)`;
+        syncAllToolsUIs();
+      } else if (act === 'askClearLogs') {
+        toolsUIState.confirmClearLogs = true;
+        syncAllToolsUIs();
+      } else if (act === 'confirmClearLogs') {
+        tmState.sessionLogs = [];
+        toolsUIState.confirmClearLogs = false;
+        toolsUIState.exportNotice = 'All session history cleared';
+        playSoundEffect('loss', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+      } else if (act === 'cancelClearLogs') {
+        toolsUIState.confirmClearLogs = false;
+        syncAllToolsUIs();
+      } else if (act === 'resetDefaults') {
+        toolsState = {
+          soundEnabled: true, soundVolume: 0.85, toneStyle: 'sniper',
+          soundCategories: { signals: true, wins: true, losses: true, milestones: true, clicks: true, countdown: true },
+          voiceLanguage: 'English', voiceAnnounceEnabled: true, currentTheme: 'dark',
+          fireworksVariant: 'golden_royal',
+          webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
+          apiKey: 'pk_live_aladdin_sniper_92'
+        };
+        audioEnabled = true;
+        if (audioToggleBtn) audioToggleBtn.textContent = '🔊';
+        applyGenieTheme('dark');
+        toolsUIState.resetFeedback = true;
+        playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+        savePersistedState();
+        syncAllToolsUIs();
+        setTimeout(() => { toolsUIState.resetFeedback = false; syncAllToolsUIs(); }, 1800);
+      }
+      return true;
+    }
+
+    function handleToolsFieldUpdate(e, shouldRerender) {
+      const el = e.target;
+      if (!el) return;
+      if (el.classList && el.classList.contains('al-tools-vol')) {
+        const pct = Math.max(0, Math.min(100, parseInt(el.value, 10) || 0));
+        toolsState.soundVolume = pct / 100;
+        savePersistedState();
+        if (shouldRerender) {
+          syncAllToolsUIs();
+        } else if (root) {
+          root.querySelectorAll('.al-tools-vol').forEach(inp => {
+            if (inp !== el) inp.value = String(pct);
+            const lbl = inp.previousElementSibling;
+            if (lbl) lbl.textContent = `VOL ${pct}%`;
+          });
+        }
+        return;
+      }
+      if (el.classList && el.classList.contains('al-tools-webhook')) {
+        toolsState.webhookUrl = el.value;
+        savePersistedState();
+        return;
+      }
+      if (el.classList && el.classList.contains('al-tools-apikey')) {
+        toolsState.apiKey = el.value;
+        savePersistedState();
+      }
+    }
+
+    if (toolsRootEl) {
+      toolsRootEl.addEventListener('click', (e) => { handleToolsClick(e); });
+      toolsRootEl.addEventListener('input', (e) => handleToolsFieldUpdate(e, false));
+      toolsRootEl.addEventListener('change', (e) => handleToolsFieldUpdate(e, true));
+    }
+
+    if (dockActionHostEl) {
+      dockActionHostEl.addEventListener('click', (e) => {
+        const actBtn = e.target.closest('[data-dock-act]');
+        if (!actBtn) return;
+        const act = actBtn.getAttribute('data-dock-act');
+        if (act === 'execBuy') {
+          const s = currentStake > 0 ? currentStake : getTMComputed().nextStake;
+          executeTrade('CALL', s);
+        } else if (act === 'execSell') {
+          const s = currentStake > 0 ? currentStake : getTMComputed().nextStake;
+          executeTrade('PUT', s);
+        } else if (act === 'toggleTradeMode') {
+          playTMBeep('click');
+          tmState.tradeActionMode = tmState.tradeActionMode === 'BUY_SELL' ? 'WIN_LOSS' : 'BUY_SELL';
+          savePersistedState();
+          renderTradeManager();
+        } else if (act === 'recWin') {
+          recordTMOutcome('WIN');
+        } else if (act === 'recLoss') {
+          recordTMOutcome('LOSS');
+        }
+      });
     }
 
     // -----------------------------------------------------------------------
@@ -9015,6 +9259,27 @@
 
     navTabs.forEach(tab => {
       tab.addEventListener('click', () => {
+        const fsJump = tab.getAttribute('data-fs-jump');
+        if (fsJump) {
+          const isFs = !!(card && card.classList.contains('fullscreen'));
+          if (!isFs) {
+            showNotification('Open Fullscreen (⛶) for Session Log & P&L', 'error');
+            return;
+          }
+          playSoundEffect('click', toolsState.soundVolume, toolsState.toneStyle);
+          navTabs.forEach(t => t.classList.remove('active'));
+          tabPanes.forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          savedLayout.activeTab = 'manager';
+          tmState.activeSubTab = fsJump;
+          savePersistedState();
+          card.classList.remove('al-signal-cam');
+          const mgrPane = root.querySelector('#al-pane-manager');
+          if (mgrPane) mgrPane.classList.add('active');
+          renderTradeManager();
+          return;
+        }
+
         navTabs.forEach(t => t.classList.remove('active'));
         tabPanes.forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
@@ -9027,8 +9292,11 @@
         if (tabName === 'manager') renderTradeManager();
         if (tabName === 'challenges') renderChallengeTab();
         if (tabName === 'paradox') renderParadoxTab();
+        if (tabName === 'tools') renderStandaloneToolsTab();
         if (tabName === 'logs') updateLogsDisplay();
         if (tabName === 'radar') syncLiveQuoteHUDNow();
+        renderDockActions();
+        syncFixedDockVisibility();
       });
     });
 
@@ -9077,8 +9345,10 @@
       if (tmState.activeSubTab === 'session_log' || tmState.activeSubTab === 'calendar') {
         tmState.activeSubTab = 'trade';
         savePersistedState();
-        if (savedLayout.activeTab === 'manager') renderTradeManager();
       }
+      navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === savedLayout.activeTab));
+      renderTradeManager();
+      renderDockActions();
       clampFloatingBounds();
     });
 
@@ -9094,9 +9364,11 @@
           tmState.activeSubTab = 'trade';
           savePersistedState();
         }
+        navTabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === savedLayout.activeTab));
         clampFloatingBounds();
       }
-      if (savedLayout.activeTab === 'manager') renderTradeManager();
+      renderTradeManager();
+      renderDockActions();
     });
 
     let startX, startY, initialLeft, initialTop;
@@ -9218,6 +9490,8 @@
     renderTradeManager();
     renderChallengeTab();
     renderParadoxTab();
+    renderStandaloneToolsTab();
+    renderDockActions();
     updatePlanDisplay();
     updateLogsDisplay();
   }
