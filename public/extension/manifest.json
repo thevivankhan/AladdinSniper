@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "AladdinGenie - Pocket Option Floating Bot",
+  "version": "7.5.0",
+  "version_name": "7.5.0",
+  "description": "AladdinGenie Pro v7.5.0: Full Trade Manager + 333/444 Mode + Paradox Matrix + Viewfinder 60-Candle Hybrid Fusion Scanner.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon-48.png",
+    "default_title": "AladdinGenie"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ],
+      "js": ["page_hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page_hook.js"],
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ]
+    }
+  ],
+  "permissions": ["storage"]
+}

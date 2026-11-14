@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+html, body {
+  background-color: #050914;
+  color: #f1f5f9;
+  overscroll-behavior-y: none;
+  accent-color: #06b6d4;
+}
+
+@theme {
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --glow-emerald: 0 0 15px rgba(16, 185, 129, 0.4);
+  --glow-cyan: 0 0 15px rgba(6, 182, 212, 0.4);
+  --glow-purple: 0 0 15px rgba(168, 85, 247, 0.4);
+}
+
+@keyframes rainbowBorder {
+  0% {
+    border-color: #06b6d4;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+  }
+  20% {
+    border-color: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+  }
+  40% {
+    border-color: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+  }
+  60% {
+    border-color: #ec4899;
+    box-shadow: 0 0 6px rgba(236, 72, 153, 0.4);
+  }
+  80% {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+  }
+  100% {
+    border-color: #06b6d4;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+  }
+}
+
+.chart-neon-border {
+  border: 1px solid #06b6d4;
+  border-radius: 4px;
+  animation: rainbowBorder 7s linear infinite;
+}
+
+@keyframes celebrationPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+
