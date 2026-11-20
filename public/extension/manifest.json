@@ -1,0 +1,86 @@
+{
+  "manifest_version": 3,
+  "name": "AladdinGenie - Pocket Option Floating Bot",
+  "version": "1.0.0.20",
+  "version_name": "1.0.0.020",
+  "description": "AladdinGenie Version 1.0.0.020: Zero-Lag Market-Adaptive Price-Action Sniper Engine (5s/15s) — Pullback-to-Value + BB(20/2.5) Exhaustion Snapback + Fractal-4 Break & Retest + Stoch(14,3,3) Zero-Lag Hook + Live Walk-Forward Pair-Edge Filter + 3L Discipline Shield.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon-48.png",
+    "default_title": "AladdinGenie"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ],
+      "js": ["page_hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page_hook.js"],
+      "matches": [
+        "https://*.p.finance/*",
+        "https://m.p.finance/*",
+        "https://*.pocketoption.com/*",
+        "https://*.pocket-friends.co/*",
+        "https://*.po.trade/*",
+        "https://*.pocketoption.trade/*",
+        "https://*.po8.cash/*",
+        "https://*.po2.cash/*",
+        "https://*.po-trade.com/*",
+        "https://*.pocketoption.net/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://*.p.finance/*",
+    "https://m.p.finance/*",
+    "https://*.pocketoption.com/*",
+    "https://*.pocket-friends.co/*",
+    "https://*.po.trade/*",
+    "https://*.pocketoption.trade/*",
+    "https://*.po8.cash/*",
+    "https://*.po2.cash/*",
+    "https://*.po-trade.com/*",
+    "https://*.pocketoption.net/*"
+  ],
+  "permissions": ["storage", "activeTab", "tabCapture"]
+}
