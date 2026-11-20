@@ -454,11 +454,11 @@ export const CompoundingPlans = () => {
           onClick={() => setMainSection('calculator')}
           className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[6px] text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
             mainSection === 'calculator'
-              ? 'bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+              ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/85 text-cyan-300 border border-cyan-500/45 shadow-[0_0_16px_rgba(6,182,212,0.22)] ring-1 ring-cyan-500/25'
               : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
           }`}
         >
-          <Calculator className={`w-3.5 h-3.5 ${mainSection === 'calculator' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
+          <Calculator className={`w-3.5 h-3.5 ${mainSection === 'calculator' ? 'text-cyan-400 drop-shadow-[0_0_7px_rgba(34,211,238,0.5)]' : 'text-zinc-500'}`} />
           <span>Aladdin AI Trade Manager</span>
         </button>
 
@@ -467,11 +467,11 @@ export const CompoundingPlans = () => {
             onClick={() => setMainSection('paradox')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-[6px] text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap overflow-hidden ${
               mainSection === 'paradox'
-                ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+                ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/85 text-cyan-300 border border-cyan-500/45 shadow-[0_0_16px_rgba(6,182,212,0.22)] ring-1 ring-cyan-500/25'
                 : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
             }`}
           >
-            <Layers className={`w-3.5 h-3.5 shrink-0 ${mainSection === 'paradox' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
+            <Layers className={`w-3.5 h-3.5 shrink-0 ${mainSection === 'paradox' ? 'text-cyan-400 drop-shadow-[0_0_7px_rgba(34,211,238,0.5)]' : 'text-zinc-500'}`} />
             <span className="truncate">Paradox Strategy</span>
           </button>
 
@@ -479,19 +479,19 @@ export const CompoundingPlans = () => {
             onClick={() => setMainSection('genie')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-[6px] text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap overflow-hidden ${
               mainSection === 'genie'
-                ? 'bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+                ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/85 text-cyan-300 border border-cyan-500/45 shadow-[0_0_16px_rgba(6,182,212,0.22)] ring-1 ring-cyan-500/25'
                 : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
             }`}
           >
-            <img
-              src="/aladdin-blue-genie-icon.png"
-              alt="Aladdin Genie"
-              className={`w-4 h-4 object-contain shrink-0 transition-all duration-200 ${
+            <span
+              className={`text-sm leading-none shrink-0 transition-all duration-200 ${
                 mainSection === 'genie'
-                  ? 'drop-shadow-[0_0_6px_rgba(34,211,238,0.45)] opacity-100'
-                  : 'opacity-70 grayscale-[35%]'
+                  ? 'drop-shadow-[0_0_7px_rgba(34,211,238,0.55)] opacity-100'
+                  : 'opacity-70 grayscale-[45%]'
               }`}
-            />
+            >
+              🧞‍♂️
+            </span>
             <span className="truncate">Aladdin Genie</span>
           </button>
         </div>
