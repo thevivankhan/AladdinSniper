@@ -3,6 +3,7 @@ import { Target, TrendingUp, AlertTriangle, ChevronRight, Activity, CheckCircle2
 import { motion, AnimatePresence } from 'motion/react';
 import { ParadoxStrategy } from './ParadoxStrategy';
 import { PocketSniperApp } from './components/calculator/PocketSniperApp';
+import { GenieTab } from './components/genie/GenieTab';
 import { ParadoxShareModal } from './components/ParadoxShareModal';
 import {
   ParadoxMode,
@@ -86,7 +87,22 @@ const themeStyles = {
 };
 
 export const CompoundingPlans = () => {
-  const [mainSection, setMainSection] = useState<'calculator' | 'paradox'>('calculator');
+  const [mainSection, setMainSection] = useState<'calculator' | 'paradox' | 'genie'>(() => {
+    try {
+      const host = window.location.hostname.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.toLowerCase();
+      if (
+        host.startsWith('app.') ||
+        params.get('tab') === 'genie' ||
+        params.get('view') === 'genie' ||
+        hash === '#genie'
+      ) {
+        return 'genie';
+      }
+    } catch {}
+    return 'calculator';
+  });
   const [activeMode, setActiveMode] = useState<ParadoxMode | 'core'>(() => {
     const saved = localStorage.getItem('paradox_active_mode');
     return saved === '111' || saved === '222' || saved === '333' || saved === '444' || saved === 'core' ? saved : '111';
@@ -432,8 +448,8 @@ export const CompoundingPlans = () => {
 
   return (
     <div className="flex-1 flex flex-col gap-5 text-zinc-100 overflow-hidden pb-4 sm:pb-6 px-1 sm:px-3 pt-2 bg-[#0a0a0b]">
-      {/* Unified Two-Tab Primary Section Switcher */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 bg-zinc-950/80 border border-zinc-800/80 p-1.5 rounded-[8px] gap-1.5 shadow-lg shrink-0">
+      {/* Unified Section Switcher: Row 1 Trade Manager, Row 2 Paradox Strategy (Left) + Aladdin Genie (Right) */}
+      <div className="flex flex-col bg-zinc-950/80 border border-zinc-800/80 p-1.5 rounded-[8px] gap-1.5 shadow-lg shrink-0">
         <button
           onClick={() => setMainSection('calculator')}
           className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[6px] text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
@@ -446,21 +462,41 @@ export const CompoundingPlans = () => {
           <span>AladdinSniper Trade Manager</span>
         </button>
 
-        <button
-          onClick={() => setMainSection('paradox')}
-          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[6px] text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-            mainSection === 'paradox'
-              ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
-              : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
-          }`}
-        >
-          <Layers className={`w-3.5 h-3.5 shrink-0 ${mainSection === 'paradox' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
-          <span>Paradox Strategy (111 · 222 · 333 · 444)</span>
-        </button>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            onClick={() => setMainSection('paradox')}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-[6px] text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap overflow-hidden ${
+              mainSection === 'paradox'
+                ? 'bg-gradient-to-r from-indigo-950/90 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+                : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
+            }`}
+          >
+            <Layers className={`w-3.5 h-3.5 shrink-0 ${mainSection === 'paradox' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
+            <span className="truncate">Paradox Strategy (111·222·333·444)</span>
+          </button>
+
+          <button
+            onClick={() => setMainSection('genie')}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-[6px] text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap overflow-hidden ${
+              mainSection === 'genie'
+                ? 'bg-gradient-to-r from-cyan-950/90 via-sky-950/90 to-cyan-950/80 text-cyan-300 border border-cyan-400/50 shadow-[0_0_16px_rgba(34,211,238,0.22)] ring-1 ring-cyan-400/25'
+                : 'text-cyan-300/85 hover:text-cyan-200 bg-zinc-900/60 hover:bg-cyan-950/30 border border-cyan-500/25 hover:border-cyan-400/40'
+            }`}
+          >
+            <img
+              src="/aladdin-blue-genie-icon.png"
+              alt="Aladdin Genie"
+              className="w-4 h-4 object-contain shrink-0 drop-shadow-[0_0_6px_rgba(34,211,238,0.45)]"
+            />
+            <span className="truncate">Aladdin Genie</span>
+          </button>
+        </div>
       </div>
 
       {mainSection === 'calculator' ? (
         <PocketSniperApp />
+      ) : mainSection === 'genie' ? (
+        <GenieTab />
       ) : (
         <div className="flex-1 flex flex-col md:flex-row gap-6 text-zinc-100 overflow-hidden">
           {/* 1. UNIFIED PARADOX PLAN SELECTOR SIDEBAR */}

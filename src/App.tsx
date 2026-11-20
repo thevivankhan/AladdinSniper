@@ -7,7 +7,6 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { motion, AnimatePresence } from 'motion/react';
 import { CompoundingPlans } from './CompoundingPlans';
-import { GenieTab } from './components/genie/GenieTab';
 import { playSoundEffect } from './utils/audioSystem';
 
 // Aladdin Blue Genie App Icon Component (Edge-to-edge transparent diamond badge)
@@ -1197,7 +1196,7 @@ export default function App() {
   const [telegramTestMsg, setTelegramTestMsg] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeTab, setActiveTab] = useState<'scanner' | 'autobot' | 'trade' | 'compounding' | 'genie'>(() => {
+  const [activeTab, setActiveTab] = useState<'scanner' | 'autobot' | 'trade' | 'compounding'>(() => {
     try {
       const host = window.location.hostname.toLowerCase();
       const params = new URLSearchParams(window.location.search);
@@ -1208,7 +1207,7 @@ export default function App() {
         params.get('view') === 'genie' ||
         hash === '#genie'
       ) {
-        return 'genie';
+        return 'compounding';
       }
     } catch {}
     return 'scanner';
@@ -2952,71 +2951,54 @@ TASK: Predict NEXT 1 CANDLE (${timeframe} Expiry) with maximum possible accuracy
         </div>
       </header>
 
-      <main className={`flex-1 overflow-y-auto hide-scrollbar p-2 md:p-4 flex flex-col ${(activeTab === 'compounding' || activeTab === 'genie') ? 'max-w-7xl' : 'max-w-lg'} mx-auto w-full`}>
+      <main className={`flex-1 overflow-y-auto hide-scrollbar p-2 md:p-4 flex flex-col ${activeTab === 'compounding' ? 'max-w-7xl' : 'max-w-lg'} mx-auto w-full`}>
         {/* Tab Switcher */}
-        <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 mb-4 shrink-0 overflow-x-auto hide-scrollbar gap-1">
+        <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 mb-4 shrink-0 overflow-x-auto hide-scrollbar">
           <button
             onClick={() => { setActiveTab('scanner'); setResult(null); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${
               activeTab === 'scanner' 
                 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <Camera className="w-4 h-4 shrink-0" />
+            <Camera className="w-4 h-4" />
             <span className="hidden sm:inline">Scanner</span>
           </button>
           <button
             onClick={() => { setActiveTab('autobot'); setResult(null); setImage(null); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${
               activeTab === 'autobot' 
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <LineChart className="w-4 h-4 shrink-0" />
+            <LineChart className="w-4 h-4" />
             <span className="hidden sm:inline">Live Bot</span>
           </button>
           <button
             onClick={() => { setActiveTab('trade'); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${
               activeTab === 'trade' 
                 ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <BarChart3 className="w-4 h-4 shrink-0" />
+            <BarChart3 className="w-4 h-4" />
             <span className="hidden sm:inline">Trade</span>
           </button>
           <button
             onClick={() => { setActiveTab('compounding'); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${
               activeTab === 'compounding' 
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.2)]' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <Calculator className="w-4 h-4 shrink-0" />
+            <Calculator className="w-4 h-4" />
             <span className="hidden sm:inline">Calculator & Plans</span>
           </button>
-          <button
-            onClick={() => { setActiveTab('genie'); }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'genie'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-[0_0_16px_rgba(34,211,238,0.25)]'
-                : 'bg-cyan-950/20 text-cyan-400/90 hover:text-cyan-300 hover:bg-cyan-950/40 border border-cyan-500/20'
-            }`}
-          >
-            <LampIcon className="w-4 h-4 shrink-0" />
-            <span>Aladdin Genie</span>
-          </button>
         </div>
-
-        {activeTab === 'genie' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col min-h-0">
-            <GenieTab />
-          </motion.div>
-        )}
 
         {activeTab === 'compounding' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col min-h-0">
