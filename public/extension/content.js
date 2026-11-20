@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie -> Pocket Option Floating Bot Overlay (Lemur & Quetta Edition)
-// @namespace    https://aladdinsniper.io
-// @version      1.0.0.023
-// @description  AladdinGenie Version 1.0.0.023: Clean Minimal Manager Layout (Paradox|Signal side-by-side + Compact ATM inside Session bar) + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield
+// @namespace    https://www.AladdinAI.trade
+// @version      1.0.0.024
+// @description  AladdinGenie Version 1.0.0.024 (www.AladdinAI.trade): Clean Minimal Manager Layout + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -24,7 +24,7 @@
   if (window.__ALADDIN_GENIE_INJECTED__) return;
   window.__ALADDIN_GENIE_INJECTED__ = true;
 
-  const ALADDIN_VERSION = '1.0.0.023';
+  const ALADDIN_VERSION = '1.0.0.024';
   let isRecActiveFlag = false;
   console.log(`[AladdinGenie] Version ${ALADDIN_VERSION} Initializing (AladdinAI Toolbox + Real-Time 60fps VSync-Locked Screen Capture)`);
 
@@ -754,7 +754,7 @@
     glowIntensity: 'turbo', // 'normal' | 'high' | 'turbo'
     glowDefaultTurboV1: true,
     fireworksVariant: 'golden_royal', // 'golden_royal' | 'rockets' | 'dolls' | 'arcade'
-    webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
+    webhookUrl: 'https://api.aladdinai.trade/v1/webhook/trade',
     apiKey: 'pk_live_aladdin_sniper_92'
   };
 
@@ -14552,7 +14552,7 @@
           glowIntensity: 'turbo',
           glowDefaultTurboV1: true,
           fireworksVariant: 'golden_royal',
-          webhookUrl: 'https://api.aladdinsniper.live/v1/webhook/trade',
+          webhookUrl: 'https://api.aladdinai.trade/v1/webhook/trade',
           apiKey: 'pk_live_aladdin_sniper_92'
         };
         audioEnabled = true;

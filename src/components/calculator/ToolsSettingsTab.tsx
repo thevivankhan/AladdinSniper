@@ -172,7 +172,7 @@ export const ToolsSettingsTab: React.FC<ToolsSettingsTabProps> = ({
   const [pocketOptionWebhook, setPocketOptionWebhook] = useState(() => {
     return (
       localStorage.getItem('aladdin_webhook_url') ||
-      'https://api.aladdinsniper.live/v1/webhook/trade'
+      'https://api.aladdinai.trade/v1/webhook/trade'
     );
   });
   const [apiKeyInput, setApiKeyInput] = useState(() => {
@@ -511,7 +511,7 @@ export const ToolsSettingsTab: React.FC<ToolsSettingsTabProps> = ({
     setVoiceLanguage('English');
     setVoiceAnnounceEnabled(true);
     setToneStyle('sniper');
-    setPocketOptionWebhook('https://api.aladdinsniper.live/v1/webhook/trade');
+    setPocketOptionWebhook('https://api.aladdinai.trade/v1/webhook/trade');
     setApiKeyInput('pk_live_aladdin_sniper_92');
     localStorage.setItem('aladdin_app_theme', 'dark');
     localStorage.setItem('aladdin_sound_enabled', 'true');
@@ -521,7 +521,7 @@ export const ToolsSettingsTab: React.FC<ToolsSettingsTabProps> = ({
     localStorage.setItem('aladdin_sound_pack', 'sniper');
     localStorage.setItem(
       'aladdin_webhook_url',
-      'https://api.aladdinsniper.live/v1/webhook/trade'
+      'https://api.aladdinai.trade/v1/webhook/trade'
     );
     localStorage.setItem('aladdin_api_key', 'pk_live_aladdin_sniper_92');
 
@@ -1228,7 +1228,7 @@ export const ToolsSettingsTab: React.FC<ToolsSettingsTabProps> = ({
                 type="text"
                 value={pocketOptionWebhook}
                 onChange={(e) => setPocketOptionWebhook(e.target.value)}
-                placeholder="https://api.aladdinsniper.live/v1/webhook/trade"
+                placeholder="https://api.aladdinai.trade/v1/webhook/trade"
                 className="w-full bg-[#141926] border border-white/10 rounded-[4px] p-2 text-xs font-mono text-slate-300 focus:outline-none focus:border-amber-500"
               />
             </div>

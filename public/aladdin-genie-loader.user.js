@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie (Auto-Updating Loader) -> Pocket Option
-// @namespace    https://aladdinsniper.io
-// @version      1.0.0.023
-// @description  Permanent Auto-Loader Version 1.0.0.023 for AladdinGenie. Clean Minimal Manager Layout (Paradox|Signal side-by-side + Compact ATM inside Session bar) + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield.
+// @namespace    https://www.AladdinAI.trade
+// @version      1.0.0.024
+// @description  Permanent Auto-Loader Version 1.0.0.024 for AladdinGenie (www.AladdinAI.trade). Clean Minimal Manager Layout + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield.
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
