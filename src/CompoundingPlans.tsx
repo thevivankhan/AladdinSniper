@@ -459,7 +459,7 @@ export const CompoundingPlans = () => {
           }`}
         >
           <Calculator className={`w-3.5 h-3.5 ${mainSection === 'calculator' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
-          <span>AladdinSniper Trade Manager</span>
+          <span>Aladdin AI Trade Manager</span>
         </button>
 
         <div className="grid grid-cols-2 gap-1.5">
@@ -472,21 +472,25 @@ export const CompoundingPlans = () => {
             }`}
           >
             <Layers className={`w-3.5 h-3.5 shrink-0 ${mainSection === 'paradox' ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]' : 'text-zinc-500'}`} />
-            <span className="truncate">Paradox Strategy (111·222·333·444)</span>
+            <span className="truncate">Paradox Strategy</span>
           </button>
 
           <button
             onClick={() => setMainSection('genie')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-[6px] text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap overflow-hidden ${
               mainSection === 'genie'
-                ? 'bg-gradient-to-r from-cyan-950/90 via-sky-950/90 to-cyan-950/80 text-cyan-300 border border-cyan-400/50 shadow-[0_0_16px_rgba(34,211,238,0.22)] ring-1 ring-cyan-400/25'
-                : 'text-cyan-300/85 hover:text-cyan-200 bg-zinc-900/60 hover:bg-cyan-950/30 border border-cyan-500/25 hover:border-cyan-400/40'
+                ? 'bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-cyan-950/80 text-cyan-300 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+                : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/60 border border-zinc-800/70 hover:border-zinc-700/70'
             }`}
           >
             <img
               src="/aladdin-blue-genie-icon.png"
               alt="Aladdin Genie"
-              className="w-4 h-4 object-contain shrink-0 drop-shadow-[0_0_6px_rgba(34,211,238,0.45)]"
+              className={`w-4 h-4 object-contain shrink-0 transition-all duration-200 ${
+                mainSection === 'genie'
+                  ? 'drop-shadow-[0_0_6px_rgba(34,211,238,0.45)] opacity-100'
+                  : 'opacity-70 grayscale-[35%]'
+              }`}
             />
             <span className="truncate">Aladdin Genie</span>
           </button>

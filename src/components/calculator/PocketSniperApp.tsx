@@ -1070,7 +1070,7 @@ export const PocketSniperApp: React.FC = () => {
               <LampIcon className="w-full h-full object-cover" />
             </div>
             <span className="text-xs font-black tracking-widest uppercase">
-              ALADDINSNIPER
+              ALADDIN AI TRADE
             </span>
           </div>
 
