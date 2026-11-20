@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie -> Pocket Option Floating Bot Overlay (Lemur & Quetta Edition)
 // @namespace    https://aladdinsniper.io
-// @version      1.0.0.020
-// @description  AladdinGenie Version 1.0.0.020: Zero-Lag Market-Adaptive Price-Action Sniper Engine (5s/15s) — Pullback-to-Value + BB(20/2.5) Exhaustion Snapback + Fractal-4 Break & Retest + Stoch(14,3,3) Zero-Lag Hook + Live Walk-Forward Pair-Edge Filter + 3L Discipline Shield
+// @version      1.0.0.021
+// @description  AladdinGenie Version 1.0.0.021: Pro Closed-Candle Price-Action Sniper Engine (5s/15s) — Liquidity Sweeps + Pinbar/Hammer/Shooting Star + Full Engulfing Control Flips + EMA 20/BB(20,1/2.5)/Fractal-4/Stoch(14,3,3) + Live Walk-Forward Verifier + 3L Discipline Shield
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -24,7 +24,7 @@
   if (window.__ALADDIN_GENIE_INJECTED__) return;
   window.__ALADDIN_GENIE_INJECTED__ = true;
 
-  const ALADDIN_VERSION = '1.0.0.020';
+  const ALADDIN_VERSION = '1.0.0.021';
   let isRecActiveFlag = false;
   console.log(`[AladdinGenie] Version ${ALADDIN_VERSION} Initializing (AladdinAI Toolbox + Real-Time 60fps VSync-Locked Screen Capture)`);
 
@@ -62,19 +62,18 @@
   let consecutiveLosses = 0;
 
   // -------------------------------------------------------------------------
-  // ANTI-TILT DISCIPLINE SHIELD & STRICT TREND-LOCK ENGINE (v1.0.0.016)
-  // 2L -> 15m Cooldown | 3L -> 30m Cooldown | Repeat 3L (Same Session) -> 1h
-  // + Anti-Rapid-Click Guard + Broker Button Glass Shield + Strict Trend-Lock
+  // ANTI-TILT DISCIPLINE SHIELD ENGINE
+  // 3L -> 15m Cooldown | 4L -> 30m Cooldown | Repeat 3L (Same Session) -> 1h
+  // + Anti-Rapid-Click Guard + Broker Button Glass Shield + Counter-Trend Warn
   // -------------------------------------------------------------------------
   const DISCIPLINE_SHIELD_KEY = 'aladdin_discipline_shield_v1';
   let disciplineShield = {
     enabled: true,
     brokerLock: true,
     antiRapidClick: true,
-    strictTrendLock: true,
     counterTrendWarn: true,
     cooldownUntil: 0,
-    cooldownTier: 0, // 0=idle, 1=2L(15m), 2=3L(30m), 3=Repeat3L(60m), 4=RapidClick(45s)
+    cooldownTier: 0, // 0=idle, 1=3L(15m), 2=4L(30m), 3=Repeat3L(60m), 4=RapidClick(45s)
     cooldownReason: '',
     sessionDate: '',
     session3LCount: 0,
@@ -123,7 +122,6 @@
         enabled: disciplineShield.enabled !== false,
         brokerLock: disciplineShield.brokerLock !== false,
         antiRapidClick: disciplineShield.antiRapidClick !== false,
-        strictTrendLock: disciplineShield.strictTrendLock !== false,
         counterTrendWarn: disciplineShield.counterTrendWarn !== false,
         cooldownUntil: Math.max(0, Number(disciplineShield.cooldownUntil) || 0),
         cooldownTier: Number(disciplineShield.cooldownTier) || 0,
@@ -143,7 +141,6 @@
           disciplineShield.enabled = parsed.enabled !== false;
           disciplineShield.brokerLock = parsed.brokerLock !== false;
           disciplineShield.antiRapidClick = parsed.antiRapidClick !== false;
-          disciplineShield.strictTrendLock = parsed.strictTrendLock !== false;
           disciplineShield.counterTrendWarn = parsed.counterTrendWarn !== false;
           disciplineShield.cooldownUntil = Math.max(0, Number(parsed.cooldownUntil) || 0);
           disciplineShield.cooldownTier = Number(parsed.cooldownTier) || 0;
@@ -399,13 +396,6 @@
             <span>Stops panic clicking (3+ clicks/15s → 45s pause)</span>
           </div>
           <input type="checkbox" class="al-sh-toggle" data-sh-key="antiRapidClick" ${disciplineShield.antiRapidClick ? 'checked' : ''} />
-        </label>
-        <label class="al-sh-row">
-          <div>
-            <strong>Strict Trend-Lock Signals</strong>
-            <span>UP = BUY only · DOWN = SELL only (All modes)</span>
-          </div>
-          <input type="checkbox" class="al-sh-toggle" data-sh-key="strictTrendLock" ${disciplineShield.strictTrendLock ? 'checked' : ''} />
         </label>
         <label class="al-sh-row">
           <div>
@@ -856,6 +846,7 @@
   let signalFlashTimeout = null;
   let lastPOChartBuySentiment = null;
   let pairRegimeCache = { key: '', data: null };
+  let lastFiredClosedBarKey = '';
 
   let savedLayout = { left: null, top: null, width: 320, height: 492, activeTab: 'sniper', recQuality: '1080p', recAudioMode: 'both', recScope: 'screen', recScopeMigratedV8: true };
 
@@ -1056,7 +1047,6 @@
           enabled: disciplineShield.enabled,
           brokerLock: disciplineShield.brokerLock,
           antiRapidClick: disciplineShield.antiRapidClick,
-          strictTrendLock: disciplineShield.strictTrendLock,
           counterTrendWarn: disciplineShield.counterTrendWarn
         },
         signalWins,
@@ -3378,19 +3368,228 @@
     return { mid: mean, upper: mean + mult * std, lower: mean - mult * std, std };
   }
 
+  // Pure Closed-Candle Institutional Price-Action Evaluator (Evaluates JUST-CLOSED bar i with ZERO lookahead)
+  // 4 Verified Playbooks: SWEEP_PINBAR, ENGULF_SHIFT, PA_PULLBACK, BREAK_RETEST
+  function evaluateClosedBarPriceAction(bars, closes, ema9, ema20, stochKArr, stochDArr, stochRawArr, i, fractalsAtBar = null) {
+    if (i < 20 || !bars[i] || !bars[i - 1] || !bars[i - 2]) return null;
+    const c = bars[i];
+    const p = bars[i - 1];
+    const p2 = bars[i - 2];
+
+    // Local ATR(14) up to bar i
+    const atrStart = Math.max(1, i - 13);
+    let trSum = 0;
+    for (let j = atrStart; j <= i; j++) {
+      const cur = bars[j], pr = bars[j - 1].close;
+      trSum += Math.max(cur.high - cur.low, Math.abs(cur.high - pr), Math.abs(cur.low - pr));
+    }
+    const atr = trSum / Math.max(1, i - atrStart + 1);
+    if (!isFinite(atr) || atr <= 0) return null;
+
+    const bb25 = calcBBAt(closes, i, 20, 2.5);
+    const bb10 = calcBBAt(closes, i, 20, 1.0);
+    if (!bb25 || !bb10 || bb25.std <= 0) return null;
+
+    const sp = Math.max(1e-9, c.high - c.low);
+    const body = Math.abs(c.close - c.open);
+    const bodyPct = (body / sp) * 100;
+    const loWickPct = ((Math.min(c.open, c.close) - c.low) / sp) * 100;
+    const upWickPct = ((c.high - Math.max(c.open, c.close)) / sp) * 100;
+    const bull = c.close > c.open;
+    const bear = c.close < c.open;
+
+    const pSp = Math.max(1e-9, p.high - p.low);
+    const pBody = Math.abs(p.close - p.open);
+    const pBull = p.close > p.open;
+    const pBear = p.close < p.open;
+    const pLoWickPct = ((Math.min(p.open, p.close) - p.low) / pSp) * 100;
+    const pUpWickPct = ((p.high - Math.max(p.open, p.close)) / pSp) * 100;
+
+    // Recent 18-bar Swing High / Swing Low Liquidity Pool (strictly prior to bar i)
+    let swingHi = -Infinity;
+    let swingLo = Infinity;
+    for (let j = Math.max(0, i - 18); j < i; j++) {
+      if (bars[j].high > swingHi) swingHi = bars[j].high;
+      if (bars[j].low < swingLo) swingLo = bars[j].low;
+    }
+    const srRange = Math.max(1e-9, swingHi - swingLo);
+
+    const e20 = ema20[i];
+    const e20p4 = ema20[Math.max(0, i - 4)];
+    const e9 = ema9[i];
+    const e20Slope = (e20 - e20p4) / atr;
+
+    let abv = 0, blw = 0;
+    for (let j = Math.max(0, i - 8); j < i; j++) {
+      if (bars[j].close >= ema20[j]) abv++;
+      else blw++;
+    }
+    const cleanUp = e20Slope >= 0.12 && e9 > e20 && abv >= 5;
+    const cleanDn = e20Slope <= -0.12 && e9 < e20 && blw >= 5;
+    const strongUp = e20Slope >= 0.35 && e9 > e20 && abv >= 6;
+    const strongDn = e20Slope <= -0.35 && e9 < e20 && blw >= 6;
+
+    const k = stochKArr[i] ?? 50;
+    const d = stochDArr[i] ?? 50;
+    const pk = stochKArr[i - 1] ?? k;
+    const rk = stochRawArr[i] ?? k;
+    const prk = stochRawArr[i - 1] ?? rk;
+    const hookUp = (k > pk) || (rk > prk + 3.5 && k >= pk - 2.0);
+    const hookDn = (k < pk) || (rk < prk - 3.5 && k <= pk + 2.0);
+    const stochCrossUp = (pk <= (stochDArr[i - 1] ?? d) && k > d) || (k > d + 1.5 && hookUp);
+    const stochCrossDn = (pk >= (stochDArr[i - 1] ?? d) && k < d) || (k < d - 1.5 && hookDn);
+
+    const outerLo = bb25.mid - 1.75 * bb25.std;
+    const outerHi = bb25.mid + 1.75 * bb25.std;
+    const runwayUp = bb25.upper > e20 ? (bb25.upper - c.close) / (bb25.upper - e20) : 0.4;
+    const runwayDn = e20 > bb25.lower ? (c.close - bb25.lower) / (e20 - bb25.lower) : 0.4;
+
+    const fUp = fractalsAtBar && fractalsAtBar.lastUp ? fractalsAtBar.lastUp.price : null;
+    const fDn = fractalsAtBar && fractalsAtBar.lastDown ? fractalsAtBar.lastDown.price : null;
+    const fracTol = Math.max(atr * 0.48, srRange * 0.065);
+    const fracBounceUp = fDn !== null && c.low <= fDn + fracTol && c.close > fDn;
+    const fracRejectDn = fUp !== null && c.high >= fUp - fracTol && c.close < fUp;
+    const resToSupRetest = fUp !== null && p.close > fUp && c.low <= fUp + fracTol && c.close > fUp;
+    const supToResRetest = fDn !== null && p.close < fDn && c.high >= fDn - fracTol && c.close < fDn;
+
+    // Anti-Climax / Anti-Chasing check (never buy after 3 huge green candles with zero pullback!)
+    const run3Up = (c.close - p2.open) / atr;
+    const run3Dn = (p2.open - c.close) / atr;
+    const climaxTop = p2.close > p2.open && pBull && bull && run3Up >= 2.0;
+    const climaxBot = p2.close < p2.open && pBear && bear && run3Dn >= 2.0;
+
+    // Closed-candle opposing wick veto (if buyers/sellers ALREADY got sharply rejected on bar i, skip!)
+    const bullWickClear = upWickPct <= 24;
+    const bearWickClear = loWickPct <= 24;
+
+    // =========================================================================
+    // PLAYBOOK 1: SWEEP_PINBAR — Liquidity Sweep / Hammer / Shooting Star Rejection
+    // =========================================================================
+    const bullSweep = c.low <= swingLo + srRange * 0.08 && c.close > swingLo;
+    const bearSweep = c.high >= swingHi - srRange * 0.08 && c.close < swingHi;
+    const bullPin = loWickPct >= 40 && upWickPct <= 20 && c.close >= c.low + sp * 0.56;
+    const bearPin = upWickPct >= 40 && loWickPct <= 20 && c.close <= c.high - sp * 0.56;
+
+    const bullPullbackPin = bullPin && cleanUp && (pBear || p2.close < p2.open || pLoWickPct >= 30) && c.close > e20 && k <= 88 && hookUp && runwayUp >= 0.20;
+    const bearPullbackPin = bearPin && cleanDn && (pBull || p2.close > p2.open || pUpWickPct >= 30) && c.close < e20 && k >= 12 && hookDn && runwayDn >= 0.20;
+    const bullRevPin = bullPin && !strongDn && (bullSweep || c.low <= outerLo || fracBounceUp) && (k <= 40 || pk <= 34 || prk <= 22) && hookUp;
+    const bearRevPin = bearPin && !strongUp && (bearSweep || c.high >= outerHi || fracRejectDn) && (k >= 60 || pk >= 66 || prk >= 78) && hookDn;
+
+    if (bullPullbackPin || bullRevPin) {
+      const reasons = [
+        bullSweep ? 'Liquidity Sweep Pinbar' : (c.low <= outerLo ? 'BB 2.5 Hammer Reject' : 'EMA 20 Pinbar Bounce'),
+        `Lower Wick ${Math.round(loWickPct)}%`,
+        `Stoch 14,3,3 Hook Up (${Math.round(k)})`
+      ];
+      let quality = 83 + (bullSweep ? 5 : 0) + (c.low <= bb25.lower ? 4 : 0) + (fracBounceUp ? 3 : 0) + (stochCrossUp ? 3 : 0) + (loWickPct >= 52 ? 3 : 0);
+      return { dir: 'CALL', pb: 'SWEEP_PINBAR', title: bullSweep ? 'Liquidity Sweep Pinbar' : 'Pinbar Rejection Sniper', quality, reasons };
+    }
+    if (bearPullbackPin || bearRevPin) {
+      const reasons = [
+        bearSweep ? 'Liquidity Sweep Shooting Star' : (c.high >= outerHi ? 'BB 2.5 Shooting Star' : 'EMA 20 Pinbar Reject'),
+        `Upper Wick ${Math.round(upWickPct)}%`,
+        `Stoch 14,3,3 Hook Dn (${Math.round(k)})`
+      ];
+      let quality = 83 + (bearSweep ? 5 : 0) + (c.high >= bb25.upper ? 4 : 0) + (fracRejectDn ? 3 : 0) + (stochCrossDn ? 3 : 0) + (upWickPct >= 52 ? 3 : 0);
+      return { dir: 'PUT', pb: 'SWEEP_PINBAR', title: bearSweep ? 'Liquidity Sweep Reject' : 'Shooting Star Sniper', quality, reasons };
+    }
+
+    // =========================================================================
+    // PLAYBOOK 2: ENGULF_SHIFT — Confirmed Full Closed Engulfing / Star / Tweezer Flip
+    // =========================================================================
+    const bullEngulf = pBear && bull && c.close >= p.open && body >= pBody * 1.05 && bodyPct >= 48 && upWickPct <= 20;
+    const bearEngulf = pBull && bear && c.close <= p.open && body >= pBody * 1.05 && bodyPct >= 48 && loWickPct <= 20;
+    const bullTweezer = pBear && bull && Math.abs(c.low - p.low) <= atr * 0.22 && bodyPct >= 44 && upWickPct <= 20;
+    const bearTweezer = pBull && bear && Math.abs(c.high - p.high) <= atr * 0.22 && bodyPct >= 44 && loWickPct <= 20;
+
+    const atKeyLow = c.low <= swingLo + srRange * 0.22 || p.low <= outerLo || c.low <= e20 + atr * 0.48 || c.low <= bb10.upper + atr * 0.28 || fracBounceUp || resToSupRetest;
+    const atKeyHigh = c.high >= swingHi - srRange * 0.22 || p.high >= outerHi || c.high >= e20 - atr * 0.48 || c.high >= bb10.lower - atr * 0.28 || fracRejectDn || supToResRetest;
+
+    if ((bullEngulf || bullTweezer) && atKeyLow && !strongDn && !climaxTop && k <= 84 && hookUp && runwayUp >= 0.22) {
+      const reasons = [
+        bullEngulf ? 'Closed Bull Engulfing' : 'Tweezer Bottom Flip',
+        p.low <= outerLo ? 'Off BB 2.5 Outer Zone' : (fracBounceUp ? 'Fractal-4 Support' : 'Key S/R + EMA 20'),
+        `Body ${Math.round(bodyPct)}% · Stoch ${Math.round(k)}`
+      ];
+      let quality = 82 + (bullEngulf ? 4 : 2) + (cleanUp ? 4 : 0) + (p.low <= outerLo ? 3 : 0) + (stochCrossUp ? 3 : 0) + (loWickPct >= 22 ? 2 : 0);
+      return { dir: 'CALL', pb: 'ENGULF_SHIFT', title: bullEngulf ? 'Closed Bull Engulfing' : 'Tweezer Bottom Sniper', quality, reasons };
+    }
+    if ((bearEngulf || bearTweezer) && atKeyHigh && !strongUp && !climaxBot && k >= 16 && hookDn && runwayDn >= 0.22) {
+      const reasons = [
+        bearEngulf ? 'Closed Bear Engulfing' : 'Tweezer Top Flip',
+        p.high >= outerHi ? 'Off BB 2.5 Outer Zone' : (fracRejectDn ? 'Fractal-4 Resist' : 'Key S/R + EMA 20'),
+        `Body ${Math.round(bodyPct)}% · Stoch ${Math.round(k)}`
+      ];
+      let quality = 82 + (bearEngulf ? 4 : 2) + (cleanDn ? 4 : 0) + (p.high >= outerHi ? 3 : 0) + (stochCrossDn ? 3 : 0) + (upWickPct >= 22 ? 2 : 0);
+      return { dir: 'PUT', pb: 'ENGULF_SHIFT', title: bearEngulf ? 'Closed Bear Engulfing' : 'Tweezer Top Sniper', quality, reasons };
+    }
+
+    // =========================================================================
+    // PLAYBOOK 3: PA_PULLBACK — Clean Higher-Low / Lower-High EMA 20 & BB(20,1) Rejection
+    // =========================================================================
+    const dippedToValUp = c.low <= e20 + atr * 0.55 || p.low <= ema20[i - 1] + atr * 0.55 || c.low <= bb10.upper + atr * 0.28 || p.low <= bb10.upper + atr * 0.28 || resToSupRetest;
+    const bouncedToValDn = c.high >= e20 - atr * 0.55 || p.high >= ema20[i - 1] - atr * 0.55 || c.high >= bb10.lower - atr * 0.28 || p.high >= bb10.lower - atr * 0.28 || supToResRetest;
+
+    if (cleanUp && (pBear || p2.close < p2.open) && bull && bullWickClear && !climaxTop && c.close > e20 && dippedToValUp && (loWickPct >= 24 || c.close > p.high) && k <= 86 && hookUp && runwayUp >= 0.22) {
+      const reasons = [
+        c.low <= e20 + atr * 0.55 || p.low <= ema20[i - 1] + atr * 0.55 ? 'EMA 20 Pullback Close' : 'BB 20/1 Pullback Close',
+        `Higher-Low Reclaim · Stoch ${Math.round(k)}`,
+        `Runway ${Math.round(runwayUp * 100)}% → BB 2.5`
+      ];
+      let quality = 81 + (loWickPct >= 30 ? 4 : 0) + (c.close > p.high ? 3 : 0) + (stochCrossUp ? 3 : 0) + (resToSupRetest ? 4 : 0);
+      return { dir: 'CALL', pb: 'PA_PULLBACK', title: 'EMA 20 Pullback Sniper', quality, reasons };
+    }
+    if (cleanDn && (pBull || p2.close > p2.open) && bear && bearWickClear && !climaxBot && c.close < e20 && bouncedToValDn && (upWickPct >= 24 || c.close < p.low) && k >= 14 && hookDn && runwayDn >= 0.22) {
+      const reasons = [
+        c.high >= e20 - atr * 0.55 || p.high >= ema20[i - 1] - atr * 0.55 ? 'EMA 20 Bounce Reject' : 'BB 20/1 Bounce Reject',
+        `Lower-High Drop · Stoch ${Math.round(k)}`,
+        `Runway ${Math.round(runwayDn * 100)}% → BB 2.5`
+      ];
+      let quality = 81 + (upWickPct >= 30 ? 4 : 0) + (c.close < p.low ? 3 : 0) + (stochCrossDn ? 3 : 0) + (supToResRetest ? 4 : 0);
+      return { dir: 'PUT', pb: 'PA_PULLBACK', title: 'EMA 20 Pullback Sniper', quality, reasons };
+    }
+
+    // =========================================================================
+    // PLAYBOOK 4: BREAK_RETEST — Fractal-4 Flip Retest or Candle #1 BB(20,1) Launch
+    // =========================================================================
+    const bb1FreshUp = p.close <= bb10.upper && c.close > bb10.upper && bull && bodyPct >= 50 && upWickPct <= 18;
+    const bb1FreshDn = p.close >= bb10.lower && c.close < bb10.lower && bear && bodyPct >= 50 && loWickPct <= 18;
+
+    if (e20Slope >= 0.10 && e9 >= e20 && c.close > e20 && !climaxTop && (resToSupRetest || bb1FreshUp) && bull && bullWickClear && k >= 30 && k <= 78 && hookUp && runwayUp >= 0.28) {
+      const reasons = [
+        resToSupRetest ? 'Fractal-4 R→S Retest' : 'Candle #1 BB 20/1 Launch',
+        `Clean Body ${Math.round(bodyPct)}% · EMA 20 UP`,
+        `Runway ${Math.round(runwayUp * 100)}% → BB 2.5`
+      ];
+      let quality = 80 + (resToSupRetest ? 5 : 2) + (stochCrossUp ? 3 : 0);
+      return { dir: 'CALL', pb: 'BREAK_RETEST', title: resToSupRetest ? 'Fractal-4 Retest Launch' : 'BB 20/1 Fresh Breakout', quality, reasons };
+    }
+    if (e20Slope <= -0.10 && e9 <= e20 && c.close < e20 && !climaxBot && (supToResRetest || bb1FreshDn) && bear && bearWickClear && k >= 22 && k <= 70 && hookDn && runwayDn >= 0.28) {
+      const reasons = [
+        supToResRetest ? 'Fractal-4 S→R Retest' : 'Candle #1 BB 20/1 Breakdown',
+        `Clean Body ${Math.round(bodyPct)}% · EMA 20 DN`,
+        `Runway ${Math.round(runwayDn * 100)}% → BB 2.5`
+      ];
+      let quality = 80 + (supToResRetest ? 5 : 2) + (stochCrossDn ? 3 : 0);
+      return { dir: 'PUT', pb: 'BREAK_RETEST', title: supToResRetest ? 'Fractal-4 Retest Drop' : 'BB 20/1 Fresh Breakdown', quality, reasons };
+    }
+
+    return null;
+  }
+
   function evaluateLivePairRegime(closedBars, expSec, tfSec) {
     const horizon = Math.max(1, Math.min(8, Math.round(expSec / Math.max(1, tfSec)) || 3));
     const emptyBucket = () => ({ wins: 0, losses: 0, total: 0, wr: 0 });
     const emptyRes = {
       horizon,
-      pullback: emptyBucket(),
-      snapback: emptyBucket(),
-      breakout: emptyBucket(),
+      SWEEP_PINBAR: emptyBucket(),
+      ENGULF_SHIFT: emptyBucket(),
+      PA_PULLBACK: emptyBucket(),
+      BREAK_RETEST: emptyBucket(),
       overall: emptyBucket(),
-      grade: 'WARMING',
-      bestPlaybook: 'AUTO'
+      grade: 'WARMING'
     };
-    if (!closedBars || closedBars.length < 28 + horizon) return emptyRes;
+    if (!closedBars || closedBars.length < 26 + horizon) return emptyRes;
 
     const lastBar = closedBars[closedBars.length - 1];
     const cacheKey = `${poAsset}|${currentTimeframe}|${currentExpiry}|${closedBars.length}|${lastBar.time || 0}|${lastBar.close}`;
@@ -3409,103 +3608,22 @@
     const rArr = stoch.rawSeries || [];
 
     const stats = {
-      PULLBACK: emptyBucket(),
-      SNAPBACK: emptyBucket(),
+      SWEEP_PINBAR: emptyBucket(),
+      ENGULF_SHIFT: emptyBucket(),
+      PA_PULLBACK: emptyBucket(),
       BREAK_RETEST: emptyBucket()
     };
     let lastSignalIdx = -10;
 
-    for (let i = 22; i < n - horizon; i++) {
+    for (let i = 20; i < n - horizon; i++) {
       if (i - lastSignalIdx < Math.max(2, horizon - 1)) continue;
-      const c = bars[i];
-      const p = bars[i - 1];
-      const p2 = bars[i - 2];
-
-      // Local ATR(14) up to bar i
-      const atrStart = Math.max(1, i - 13);
-      let trSum = 0;
-      for (let j = atrStart; j <= i; j++) {
-        const cur = bars[j], pr = bars[j - 1].close;
-        trSum += Math.max(cur.high - cur.low, Math.abs(cur.high - pr), Math.abs(cur.low - pr));
-      }
-      const atr = trSum / Math.max(1, i - atrStart + 1);
-      if (atr <= 0) continue;
-
-      const bb25 = calcBBAt(closes, i, 20, 2.5);
-      const bb10 = calcBBAt(closes, i, 20, 1.0);
-      if (!bb25 || !bb10 || bb25.std <= 0) continue;
-
-      const e20 = ema20[i];
-      const e20p4 = ema20[Math.max(0, i - 4)];
-      const e9 = ema9[i];
-      const e20Slope = (e20 - e20p4) / atr;
-
-      const sp = Math.max(1e-9, c.high - c.low);
-      const bodyPct = (Math.abs(c.close - c.open) / sp) * 100;
-      const loWickPct = ((Math.min(c.open, c.close) - c.low) / sp) * 100;
-      const upWickPct = ((c.high - Math.max(c.open, c.close)) / sp) * 100;
-      const pSp = Math.max(1e-9, p.high - p.low);
-      const pLoWickPct = ((Math.min(p.open, p.close) - p.low) / pSp) * 100;
-      const pUpWickPct = ((p.high - Math.max(p.open, p.close)) / pSp) * 100;
-
-      const k = kArr[i] ?? 50;
-      const d = dArr[i] ?? 50;
-      const pk = kArr[i - 1] ?? k;
-      const rk = rArr[i] ?? k;
-      const prk = rArr[i - 1] ?? rk;
-      const hookUp = (k > pk) || (rk > prk + 4 && k >= pk - 2);
-      const hookDn = (k < pk) || (rk < prk - 4 && k <= pk + 2);
-
-      let abv = 0, blw = 0;
-      for (let j = i - 8; j < i; j++) {
-        if (bars[j].close >= ema20[j]) abv++;
-        else blw++;
-      }
-
-      const runwayUp = bb25.upper > e20 ? (bb25.upper - c.close) / (bb25.upper - e20) : 0;
-      const runwayDn = e20 > bb25.lower ? (c.close - bb25.lower) / (e20 - bb25.lower) : 0;
-      const outerLowZone = bb25.mid - 1.80 * bb25.std;
-      const outerHighZone = bb25.mid + 1.80 * bb25.std;
-
-      let picked = null;
-
-      // 1. PULLBACK-TO-VALUE SNIPER
-      const dippedBull = (p.close < p.open || p2.close < p2.open || pLoWickPct >= 28 || loWickPct >= 26);
-      const touchedValUp = (c.low <= e20 + atr * 0.45 || p.low <= ema20[i - 1] + atr * 0.45 || c.low <= bb10.upper + atr * 0.25 || p.low <= bb10.upper + atr * 0.25);
-      if (e20Slope >= 0.12 && e9 > e20 && abv >= 5 && dippedBull && touchedValUp && c.close > e20 && c.close > c.open && (loWickPct >= 24 || pLoWickPct >= 26 || c.close > p.high) && k <= 78 && hookUp && runwayUp >= 0.26) {
-        picked = { dir: 'CALL', pb: 'PULLBACK' };
-      } else {
-        const bouncedBear = (p.close > p.open || p2.close > p2.open || pUpWickPct >= 28 || upWickPct >= 26);
-        const touchedValDn = (c.high >= e20 - atr * 0.45 || p.high >= ema20[i - 1] - atr * 0.45 || c.high >= bb10.lower - atr * 0.25 || p.high >= bb10.lower - atr * 0.25);
-        if (e20Slope <= -0.12 && e9 < e20 && blw >= 5 && bouncedBear && touchedValDn && c.close < e20 && c.close < c.open && (upWickPct >= 24 || pUpWickPct >= 26 || c.close < p.low) && k >= 22 && hookDn && runwayDn >= 0.26) {
-          picked = { dir: 'PUT', pb: 'PULLBACK' };
-        }
-      }
-
-      // 2. BB(20, 2.5) OUTER ZONE + STOCH(14,3,3) EXHAUSTION SNAPBACK
-      if (!picked && Math.abs(e20Slope) < 0.48) {
-        const hitOuterLow = c.low <= outerLowZone || p.low <= outerLowZone;
-        const hitOuterHigh = c.high >= outerHighZone || p.high >= outerHighZone;
-        if (hitOuterLow && (k <= 28 || pk <= 24 || prk <= 18) && hookUp && c.close > c.open && c.close < e20 && (loWickPct >= 28 || pLoWickPct >= 30 || (p.close < p.open && c.close > p.open))) {
-          picked = { dir: 'CALL', pb: 'SNAPBACK' };
-        } else if (hitOuterHigh && (k >= 72 || pk >= 76 || prk >= 82) && hookDn && c.close < c.open && c.close > e20 && (upWickPct >= 28 || pUpWickPct >= 30 || (p.close > p.open && c.close < p.open))) {
-          picked = { dir: 'PUT', pb: 'SNAPBACK' };
-        }
-      }
-
-      // 3. CANDLE #1 FRESH BB(20, 1.0) CHANNEL LAUNCH
-      if (!picked) {
-        if (e20Slope >= 0.10 && e9 >= e20 && p.close <= bb10.upper && c.close > bb10.upper && c.close > c.open && bodyPct >= 45 && upWickPct <= 22 && k >= 32 && k <= 74 && k > d && hookUp && runwayUp >= 0.30) {
-          picked = { dir: 'CALL', pb: 'BREAK_RETEST' };
-        } else if (e20Slope <= -0.10 && e9 <= e20 && p.close >= bb10.lower && c.close < bb10.lower && c.close < c.open && bodyPct >= 45 && loWickPct <= 22 && k >= 26 && k <= 68 && k < d && hookDn && runwayDn >= 0.30) {
-          picked = { dir: 'PUT', pb: 'BREAK_RETEST' };
-        }
-      }
-
+      const picked = evaluateClosedBarPriceAction(bars, closes, ema9, ema20, kArr, dArr, rArr, i, null);
       if (!picked) continue;
+
+      // Exact forward expiry outcome: enter at close of bar i (= open of bar i+1), settle at bar i + horizon close!
       const exitClose = bars[i + horizon].close;
-      const diff = picked.dir === 'CALL' ? (exitClose - c.close) : (c.close - exitClose);
-      const tieBand = Math.max(1e-9, c.close * 1e-8);
+      const diff = picked.dir === 'CALL' ? (exitClose - bars[i].close) : (bars[i].close - exitClose);
+      const tieBand = Math.max(1e-9, bars[i].close * 1e-8);
       if (Math.abs(diff) <= tieBand) continue;
       const bk = stats[picked.pb];
       if (diff > 0) bk.wins++;
@@ -3518,13 +3636,14 @@
       b.wr = b.total > 0 ? Math.round((b.wins / b.total) * 100) : 0;
       return b;
     };
-    const pb = finalize(stats.PULLBACK);
-    const sb = finalize(stats.SNAPBACK);
+    const sp = finalize(stats.SWEEP_PINBAR);
+    const en = finalize(stats.ENGULF_SHIFT);
+    const pb = finalize(stats.PA_PULLBACK);
     const br = finalize(stats.BREAK_RETEST);
     const ov = finalize({
-      wins: pb.wins + sb.wins + br.wins,
-      losses: pb.losses + sb.losses + br.losses,
-      total: pb.total + sb.total + br.total,
+      wins: sp.wins + en.wins + pb.wins + br.wins,
+      losses: sp.losses + en.losses + pb.losses + br.losses,
+      total: sp.total + en.total + pb.total + br.total,
       wr: 0
     });
 
@@ -3532,14 +3651,16 @@
     if (ov.total >= 3) {
       grade = ov.wr >= 78 ? 'A+' : ov.wr >= 68 ? 'A' : ov.wr >= 56 ? 'B' : 'CHOP';
     }
-    const ranked = [
-      { name: 'PULLBACK', s: pb },
-      { name: 'SNAPBACK', s: sb },
-      { name: 'BREAK_RETEST', s: br }
-    ].filter(x => x.s.total >= 2).sort((a, b) => b.s.wr - a.s.wr || b.s.total - a.s.total);
-    const bestPlaybook = ranked.length ? ranked[0].name : 'AUTO';
 
-    const result = { horizon, pullback: pb, snapback: sb, breakout: br, overall: ov, grade, bestPlaybook };
+    const result = {
+      horizon,
+      SWEEP_PINBAR: sp,
+      ENGULF_SHIFT: en,
+      PA_PULLBACK: pb,
+      BREAK_RETEST: br,
+      overall: ov,
+      grade
+    };
     pairRegimeCache = { key: cacheKey, data: result };
     return result;
   }
@@ -3561,10 +3682,10 @@
       marketBiasPct = 50;
       realTrend = 'NEUTRAL';
       confluenceReasons = lastPrice !== null
-        ? [`Quote ${formatPrice(lastPrice)}`, `Building Candles (${activeCandles.length}/18)`]
+        ? [`Quote ${formatPrice(lastPrice)}`, `Building Candles (${activeCandles.length}/22)`]
         : [`WS In: ${telemetryStats.wsIn}`, `Canvas Px: ${telemetryStats.canvasSamples}`];
       currentPattern = lastPrice !== null
-        ? `Live Quote ${formatPrice(lastPrice)} · Warming Price Action (${activeCandles.length}/18)`
+        ? `Live Quote ${formatPrice(lastPrice)} · Warming Price Action (${activeCandles.length}/22)`
         : `Waiting for live chart feed...`;
       updateSignalUI();
       drawMiniCandlestickChart();
@@ -3574,18 +3695,16 @@
     const recent = activeCandles.slice(-130);
     const closedBars = recent.slice(0, -1);
     const closes = recent.map(c => c.close);
+    const closedCloses = closedBars.map(c => c.close);
     const latest = recent[recent.length - 1];
     const prev = recent[recent.length - 2];
-    const prev2 = recent.length >= 3 ? recent[recent.length - 3] : null;
-    const prev3 = recent.length >= 4 ? recent[recent.length - 4] : null;
     const decimals = getPriceDecimals(latest.close);
 
-    // 1. Timeframe + Expiry Horizon Sync (e.g. 5s Chart + 15s Expiry => 3-Candle Horizon)
+    // 1. Timeframe + Expiry Horizon Sync
     const tfSec = TIMEFRAME_SECONDS[currentTimeframe] || 5;
     const expSec = TIMEFRAME_SECONDS[currentExpiry] || 15;
-    const candlesHorizon = Math.max(0.5, expSec / tfSec);
 
-    // 2. Live Multi-Touch S&R + Volatility & Noise Guards
+    // 2. Structural S&R + Volatility Guards
     const srBars = recent.slice(-55);
     const sr = computeMultiTouchSR(srBars, decimals);
     realSupport = sr.support;
@@ -3602,102 +3721,39 @@
     const isDeadFlat = range <= 0 || atr14 <= 0 || (recent.length >= 8 && uniqueTailCloses < 2);
     const latestRange = Math.max(0, latest.high - latest.low);
     const prevRange = Math.max(0, prev.high - prev.low);
-    const isWildSpike = atr14 > 0 && (latestRange > atr14 * 2.85 || prevRange > atr14 * 3.3);
+    const isWildSpike = atr14 > 0 && (latestRange > atr14 * 2.95 || prevRange > atr14 * 3.4);
 
-    // 3. Exact User Chart 5 Core Indicators (Zero-Lag Tuned):
-    //    (1) EMA 20 (+ EMA 9 fast slope), (2) Fractal-4, (3) Stoch (14, 3, 3 Default + Zero-Lag RawK),
-    //    (4) BB (20, 1.0) Inner Channel, (5) BB (20, 2.5) Outer Extreme
-    const ema9Series = calcEMASeries(closes, 9);
-    const ema20Series = calcEMASeries(closes, 20);
+    // 3. Live Indicators for HUD + Closed-Candle Series for Exact Signal Evaluation
+    const ema9Live = calcEMASeries(closes, 9);
+    const ema20Live = calcEMASeries(closes, 20);
     const eLen = closes.length;
-    const ema9Now = ema9Series[eLen - 1] ?? latest.close;
-    const ema9Prev1 = ema9Series[Math.max(0, eLen - 2)] ?? ema9Now;
-    const ema20Now = ema20Series[eLen - 1] ?? latest.close;
-    const ema20Prev1 = ema20Series[Math.max(0, eLen - 2)] ?? ema20Now;
-    const ema20Prev4 = ema20Series[Math.max(0, eLen - 5)] ?? ema20Prev1;
+    const ema9Now = ema9Live[eLen - 1] ?? latest.close;
+    const ema20Now = ema20Live[eLen - 1] ?? latest.close;
+    const ema20Prev1 = ema20Live[Math.max(0, eLen - 2)] ?? ema20Now;
+    const ema20Prev4 = ema20Live[Math.max(0, eLen - 5)] ?? ema20Prev1;
     const ema20SlopeAtr = (ema20Now - ema20Prev4) / atrUnit;
 
-    const priceAboveEma20 = latest.close > ema20Now;
-    const priceBelowEma20 = latest.close < ema20Now;
-    const ema20SlopeUp = ema20Now > ema20Prev1 && ema20SlopeAtr >= 0.11;
-    const ema20SlopeDn = ema20Now < ema20Prev1 && ema20SlopeAtr <= -0.11;
-
-    // Count clean EMA 20 dominance over the last 8 closed bars
     let closedAboveEma20 = 0;
     let closedBelowEma20 = 0;
-    const domStart = Math.max(0, eLen - 9);
-    for (let j = domStart; j < eLen - 1; j++) {
-      if (recent[j].close >= ema20Series[j]) closedAboveEma20++;
+    for (let j = Math.max(0, eLen - 9); j < eLen - 1; j++) {
+      if (recent[j].close >= ema20Live[j]) closedAboveEma20++;
       else closedBelowEma20++;
     }
-
-    const bb25 = calcBollinger(closes, 20, 2.5);
-    const bb10 = calcBollinger(closes, 20, 1.0);
-    const bbStd = bb25 ? Math.max(0.0000001, bb25.std) : atrUnit * 0.5;
-    const outerLowZone = bb25 ? (bb25.mid - 1.80 * bbStd) : (ema20Now - atrUnit * 2.0);
-    const outerHighZone = bb25 ? (bb25.mid + 1.80 * bbStd) : (ema20Now + atrUnit * 2.0);
-
-    const inUpperWhiteZone = !!(bb10 && bb25 && latest.close >= bb10.upper && latest.close <= bb25.upper * 1.0002 && priceAboveEma20);
-    const inLowerWhiteZone = !!(bb10 && bb25 && latest.close <= bb10.lower && latest.close >= bb25.lower * 0.9998 && priceBelowEma20);
-    const aboveOuterZone = !!(latest.high >= outerHighZone || prev.high >= outerHighZone);
-    const belowOuterZone = !!(latest.low <= outerLowZone || prev.low <= outerLowZone);
-    const aboveBB25 = !!(bb25 && latest.high >= bb25.upper);
-    const belowBB25 = !!(bb25 && latest.low <= bb25.lower);
-
-    // Runway remaining between current price and BB(20, 2.5) outer wall (prevents buying the top / selling the bottom!)
-    const runwayUp = bb25 && bb25.upper > ema20Now ? (bb25.upper - latest.close) / (bb25.upper - ema20Now) : 0.5;
-    const runwayDn = bb25 && ema20Now > bb25.lower ? (latest.close - bb25.lower) / (ema20Now - bb25.lower) : 0.5;
-
-    const stoch = computeStoch1433(recent, 14, 3, 3);
-    realStochK = stoch.k;
-    realStochD = stoch.d;
-    const stochHookUp = (stoch.k > stoch.prevK) || (stoch.rawK > stoch.prevRawK + 3.5 && stoch.k >= stoch.prevK - 2.0);
-    const stochHookDn = (stoch.k < stoch.prevK) || (stoch.rawK < stoch.prevRawK - 3.5 && stoch.k <= stoch.prevK + 2.0);
-    const stochCrossUp = (stoch.prevK <= stoch.prevD && stoch.k > stoch.d) || (stoch.k > stoch.d + 1.5 && stochHookUp);
-    const stochCrossDn = (stoch.prevK >= stoch.prevD && stoch.k < stoch.d) || (stoch.k < stoch.d - 1.5 && stochHookDn);
-    const stochEmbeddedBull = inUpperWhiteZone && stoch.k >= 80 && stoch.k >= stoch.d - 1.0 && ema20SlopeAtr >= 0.35;
-    const stochEmbeddedBear = inLowerWhiteZone && stoch.k <= 20 && stoch.k <= stoch.d + 1.0 && ema20SlopeAtr <= -0.35;
-
-    const fractals = computeFractals(srBars, 4);
-    const fracTol = Math.max(avgBarSpan * 0.48, range * 0.065);
-    const fracBounceUp = !!(fractals.lastDown && (prev.low <= fractals.lastDown.price + fracTol || latest.low <= fractals.lastDown.price + fracTol) && latest.close > fractals.lastDown.price);
-    const fracRejectDn = !!(fractals.lastUp && (prev.high >= fractals.lastUp.price - fracTol || latest.high >= fractals.lastUp.price - fracTol) && latest.close < fractals.lastUp.price);
-    const resToSupRetest = !!(fractals.lastUp && prev2 && prev2.close > fractals.lastUp.price && (prev.low <= fractals.lastUp.price + fracTol || latest.low <= fractals.lastUp.price + fracTol) && latest.close > fractals.lastUp.price);
-    const supToResRetest = !!(fractals.lastDown && prev2 && prev2.close < fractals.lastDown.price && (prev.high >= fractals.lastDown.price - fracTol || latest.high >= fractals.lastDown.price - fracTol) && latest.close < fractals.lastDown.price);
-    const fracBreakUp = !!(fractals.lastUp && prev.close <= fractals.lastUp.price && latest.close > fractals.lastUp.price + atrUnit * 0.08);
-    const fracBreakDn = !!(fractals.lastDown && prev.close >= fractals.lastDown.price && latest.close < fractals.lastDown.price - atrUnit * 0.08);
-
-    // Supporting Diagnostics (Wilder RSI + ADX 14 for HUD & Runaway-Trend Protection — NOT used as lagging bottlenecks!)
-    const rsiSeries = calcWilderRSISeries(closes, 14);
-    const rLen = rsiSeries.length;
-    realRSI = rsiSeries[rLen - 1] ?? 50;
-    const prevRSI = rsiSeries[Math.max(0, rLen - 2)] ?? realRSI;
-    const adx = computeADX14(recent, 14);
-
-    // 4. Clean Market Regime Classification (Used by HUD, Shield Counter-Trend Warning & Playbooks)
-    const cleanUptrend = priceAboveEma20 && ema20SlopeUp && ema9Now > ema20Now && closedAboveEma20 >= 5;
-    const cleanDowntrend = priceBelowEma20 && ema20SlopeDn && ema9Now < ema20Now && closedBelowEma20 >= 5;
-    const steepRunawayUp = cleanUptrend && ema20SlopeAtr >= 0.38 && adx.strongBull;
-    const steepRunawayDn = cleanDowntrend && ema20SlopeAtr <= -0.38 && adx.strongBear;
+    const cleanUptrend = latest.close > ema20Now && ema20SlopeAtr >= 0.12 && ema9Now > ema20Now && closedAboveEma20 >= 5;
+    const cleanDowntrend = latest.close < ema20Now && ema20SlopeAtr <= -0.12 && ema9Now < ema20Now && closedBelowEma20 >= 5;
     realTrend = cleanUptrend ? 'UPTREND' : cleanDowntrend ? 'DOWNTREND' : 'RANGING';
 
-    // 5. Real Candle Anatomy, Rejection Wicks & Closed Price-Action Patterns
-    const prevBull = prev.close > prev.open;
-    const prevBear = prev.close < prev.open;
-    const prevSpan = Math.max(0.000001, prev.high - prev.low);
-    const prevBody = Math.max(0.0000005, Math.abs(prev.close - prev.open));
-    const prevUpperWick = Math.max(0, prev.high - Math.max(prev.open, prev.close));
-    const prevLowerWick = Math.max(0, Math.min(prev.open, prev.close) - prev.low);
-    const prevUpperPct = Math.round((prevUpperWick / prevSpan) * 100);
-    const prevBodyPct = Math.round((prevBody / prevSpan) * 100);
-    const prevLowerPct = Math.round((prevLowerWick / prevSpan) * 100);
+    const stochLive = computeStoch1433(recent, 14, 3, 3);
+    realStochK = stochLive.k;
+    realStochD = stochLive.d;
+    const rsiSeries = calcWilderRSISeries(closes, 14);
+    realRSI = rsiSeries[rsiSeries.length - 1] ?? 50;
 
+    // Candle Anatomy HUD + Live Bar Confirmation Metrics
     const liveSpan = Math.max(0.000001, latest.high - latest.low);
-    const liveBody = Math.max(0.0000005, Math.abs(latest.close - latest.open));
     const liveUpperWick = Math.max(0, latest.high - Math.max(latest.open, latest.close));
     const liveLowerWick = Math.max(0, Math.min(latest.open, latest.close) - latest.low);
     const liveUpperPct = latest.high > latest.low ? Math.round((liveUpperWick / liveSpan) * 100) : 0;
-    const liveBodyPct = latest.high > latest.low ? Math.round((liveBody / liveSpan) * 100) : 0;
     const liveLowerPct = latest.high > latest.low ? Math.round((liveLowerWick / liveSpan) * 100) : 0;
     const isBullCandle = latest.close > latest.open;
     const isBearCandle = latest.close < latest.open;
@@ -3716,250 +3772,38 @@
     }
 
     const wickTrend = computeWickTrend(closedBars);
-    const patterns = detectClosedCandlePatterns(prev, prev2, prev3, atrUnit);
-    const isIndecisiveDoji = prevBodyPct < 18 && prevUpperPct >= 30 && prevLowerPct >= 30 && liveBodyPct < 22;
-
-    // Hard Anti-Peak-Chasing Guard (Prevents the v018/v019 bug of buying the 4th green bar at the top!)
-    const waveRun3Buy = prev2 ? (latest.close - prev2.open) / atrUnit : 0;
-    const waveRun3Sell = prev2 ? (prev2.open - latest.close) / atrUnit : 0;
-    const chasedTopBuy = !!(prev2 && prev2.close > prev2.open && prevBull && isBullCandle && waveRun3Buy >= 1.85) || runwayUp < 0.16;
-    const chasedBotSell = !!(prev2 && prev2.close < prev2.open && prevBear && isBearCandle && waveRun3Sell >= 1.85) || runwayDn < 0.16;
-
-    const nearSupport = prev.low <= realSupport + range * 0.18 || latest.low <= realSupport + range * 0.18;
-    const nearResistance = prev.high >= realResistance - range * 0.18 || latest.high >= realResistance - range * 0.18;
-    const distToResRatio = Math.max(0, (realResistance - latest.close) / range);
-    const distToSupRatio = Math.max(0, (latest.close - realSupport) / range);
     const vel = computeTickVelocity(now, range);
 
-    // 6. Live In-Memory Walk-Forward Pair-Edge Audit (Exact 15s / 3-Candle Empirical Verification)
+    // 4. Live In-Memory Walk-Forward Pair-Edge Audit (1:1 Synced with Closed-Candle Playbooks)
     const pairAudit = evaluateLivePairRegime(closedBars, expSec, tfSec);
 
-    // =========================================================================
-    // 7. MARKET-ADAPTIVE ZERO-LAG PRICE-ACTION PLAYBOOKS (NO SCORE SOUP!)
-    //    Playbook A: PULLBACK      -> Discount Dip/Bounce Rejection to EMA20 / BB(20,1) / Fractal-4
-    //    Playbook B: SNAPBACK      -> BB(20,2.5) Outer Extreme + Stoch(14,3,3) + S/R / Fractal-4 Reversal
-    //    Playbook C: BREAK_RETEST  -> Fractal-4 R->S / S->R Retest & Candle #1 BB(20,1) Channel Launch
-    // =========================================================================
-    const strictTrendOn = disciplineShield.strictTrendLock !== false;
-    const candidates = [];
-
-    const liveOpposingBuy = (latest.close < latest.open - atrUnit * 0.05) || liveUpperPct >= 34 || (vel.dir === 'SELL' && vel.strength >= 0.60);
-    const liveOpposingSell = (latest.close > latest.open + atrUnit * 0.05) || liveLowerPct >= 34 || (vel.dir === 'BUY' && vel.strength >= 0.60);
-
-    // --- PLAYBOOK A: TREND PULLBACK REJECTION SNIPER (Buying the Dip / Selling the Bounce!) ---
-    const hadPullbackDipBuy = !!(prevBear || (prev2 && prev2.close < prev2.open) || prevLowerPct >= 28 || liveLowerPct >= 26);
-    const touchedValueBuy = !!(
-      prev.low <= ema20Prev1 + atrUnit * 0.45 ||
-      latest.low <= ema20Now + atrUnit * 0.45 ||
-      (bb10 && (prev.low <= bb10.upper + atrUnit * 0.28 || latest.low <= bb10.upper + atrUnit * 0.28)) ||
-      resToSupRetest ||
-      fracBounceUp
-    );
-    const bullRejectTrigger = (
-      prevLowerPct >= 26 ||
-      liveLowerPct >= 25 ||
-      Boolean(patterns.bullPattern) ||
-      (prevBear && latest.close > prev.open) ||
-      latest.close > prev.high
-    );
-    if (
-      cleanUptrend &&
-      hadPullbackDipBuy &&
-      touchedValueBuy &&
-      bullRejectTrigger &&
-      isBullCandle &&
-      !chasedTopBuy &&
-      !liveOpposingBuy &&
-      !wickTrend.upperWickWall &&
-      stoch.k <= 78 &&
-      stochHookUp &&
-      runwayUp >= 0.25 &&
-      (distToResRatio >= 0.16 || fracBreakUp || resToSupRetest)
-    ) {
-      const reasons = [
-        (prev.low <= ema20Prev1 + atrUnit * 0.45 || latest.low <= ema20Now + atrUnit * 0.45) ? 'EMA 20 Dip Rejection' : (resToSupRetest ? 'Fractal-4 R→S Retest' : 'BB 20/1 Pullback Bounce'),
-        `Stoch 14,3,3 Hook Up (${stoch.k})`,
-        `Runway ${Math.round(runwayUp * 100)}% → BB 2.5`
-      ];
-      let quality = 80;
-      if (liveLowerPct >= 30 || prevLowerPct >= 34) { quality += 4; reasons.push(`Lower Wick ${Math.max(liveLowerPct, prevLowerPct)}%`); }
-      if (patterns.bullPattern) { quality += 5; reasons.push(patterns.bullPattern); }
-      if (wickTrend.bullWickTrend) { quality += 3; reasons.push('Bull Wick Pressure'); }
-      if (stochCrossUp) { quality += 3; }
-      if (vel.snapBounceUp) { quality += 3; reasons.push('Live Tick Reclaim'); }
-      if (fracBounceUp || resToSupRetest) { quality += 4; }
-      candidates.push({ dir: 'CALL', pb: 'PULLBACK', title: 'EMA 20 Pullback Sniper', quality, reasons, wf: pairAudit.pullback });
+    // 5. Evaluate JUST-CLOSED Candle (prev) via Pro Closed-Candle Price-Action Engine (ZERO Flicker Repaint!)
+    let closedSetup = null;
+    if (closedBars.length >= 21) {
+      const closedEma9 = calcEMASeries(closedCloses, 9);
+      const closedEma20 = calcEMASeries(closedCloses, 20);
+      const closedStoch = computeStoch1433(closedBars, 14, 3, 3);
+      const closedFractals = computeFractals(closedBars.slice(-55), 4);
+      const lastClosedIdx = closedBars.length - 1;
+      closedSetup = evaluateClosedBarPriceAction(
+        closedBars,
+        closedCloses,
+        closedEma9,
+        closedEma20,
+        closedStoch.kSeries || [],
+        closedStoch.dSeries || [],
+        closedStoch.rawSeries || [],
+        lastClosedIdx,
+        closedFractals
+      );
     }
 
-    const hadPullbackBounceSell = !!(prevBull || (prev2 && prev2.close > prev2.open) || prevUpperPct >= 28 || liveUpperPct >= 26);
-    const touchedValueSell = !!(
-      prev.high >= ema20Prev1 - atrUnit * 0.45 ||
-      latest.high >= ema20Now - atrUnit * 0.45 ||
-      (bb10 && (prev.high >= bb10.lower - atrUnit * 0.28 || latest.high >= bb10.lower - atrUnit * 0.28)) ||
-      supToResRetest ||
-      fracRejectDn
-    );
-    const bearRejectTrigger = (
-      prevUpperPct >= 26 ||
-      liveUpperPct >= 25 ||
-      Boolean(patterns.bearPattern) ||
-      (prevBull && latest.close < prev.open) ||
-      latest.close < prev.low
-    );
-    if (
-      cleanDowntrend &&
-      hadPullbackBounceSell &&
-      touchedValueSell &&
-      bearRejectTrigger &&
-      isBearCandle &&
-      !chasedBotSell &&
-      !liveOpposingSell &&
-      !wickTrend.lowerWickWall &&
-      stoch.k >= 22 &&
-      stochHookDn &&
-      runwayDn >= 0.25 &&
-      (distToSupRatio >= 0.16 || fracBreakDn || supToResRetest)
-    ) {
-      const reasons = [
-        (prev.high >= ema20Prev1 - atrUnit * 0.45 || latest.high >= ema20Now - atrUnit * 0.45) ? 'EMA 20 Bounce Reject' : (supToResRetest ? 'Fractal-4 S→R Retest' : 'BB 20/1 Pullback Reject'),
-        `Stoch 14,3,3 Hook Dn (${stoch.k})`,
-        `Runway ${Math.round(runwayDn * 100)}% → BB 2.5`
-      ];
-      let quality = 80;
-      if (liveUpperPct >= 30 || prevUpperPct >= 34) { quality += 4; reasons.push(`Upper Wick ${Math.max(liveUpperPct, prevUpperPct)}%`); }
-      if (patterns.bearPattern) { quality += 5; reasons.push(patterns.bearPattern); }
-      if (wickTrend.bearWickTrend) { quality += 3; reasons.push('Bear Wick Pressure'); }
-      if (stochCrossDn) { quality += 3; }
-      if (vel.snapRejectDown) { quality += 3; reasons.push('Live Tick Reject'); }
-      if (fracRejectDn || supToResRetest) { quality += 4; }
-      candidates.push({ dir: 'PUT', pb: 'PULLBACK', title: 'EMA 20 Pullback Sniper', quality, reasons, wf: pairAudit.pullback });
-    }
-
-    // --- PLAYBOOK B: BB(20, 2.5) OUTER EXHAUSTION + STOCH(14,3,3) + S/R / FRACTAL-4 SNAPBACK ---
-    // Adapts naturally to OTC & Ranging charts; only blocked against a steep runaway embedded trend!
-    const snapBuyTrendGuard = strictTrendOn ? (!steepRunawayDn && !stochEmbeddedBear && ema20SlopeAtr > -0.45) : (!stochEmbeddedBear && !(steepRunawayDn && adx.adx >= 32));
-    const snapSellTrendGuard = strictTrendOn ? (!steepRunawayUp && !stochEmbeddedBull && ema20SlopeAtr < 0.45) : (!stochEmbeddedBull && !(steepRunawayUp && adx.adx >= 32));
-
-    const snapBuyStructural = nearSupport || fracBounceUp || belowBB25 || realRSI <= 32;
-    const snapBuyAction = prevLowerPct >= 30 || liveLowerPct >= 28 || patterns.isBullReversal || (prevBear && latest.close > prev.open);
-    if (
-      snapBuyTrendGuard &&
-      belowOuterZone &&
-      snapBuyStructural &&
-      snapBuyAction &&
-      isBullCandle &&
-      !liveOpposingBuy &&
-      priceBelowEma20 &&
-      (stoch.k <= 28 || stoch.prevK <= 24 || stoch.prevRawK <= 18) &&
-      stochHookUp
-    ) {
-      const reasons = [
-        belowBB25 ? 'BB 20/2.5 Lower Snapback' : 'Outer BB 2.5 Exhaustion',
-        `Stoch 14,3,3 Turn Up (${stoch.k})`,
-        fracBounceUp ? 'Fractal-4 Support Wall' : (nearSupport ? `Support ${sr.supTouches}x Hold` : `Oversold RSI ${realRSI}`)
-      ];
-      let quality = 80;
-      if (belowBB25) quality += 4;
-      if (patterns.bullPattern) { quality += 5; reasons.push(patterns.bullPattern); }
-      else if (Math.max(prevLowerPct, liveLowerPct) >= 34) { quality += 4; reasons.push(`Rejection Wick ${Math.max(prevLowerPct, liveLowerPct)}%`); }
-      if (nearSupport && sr.supTouches >= 2) quality += 3;
-      if (vel.snapBounceUp) { quality += 3; reasons.push('Live Snap Bounce'); }
-      candidates.push({ dir: 'CALL', pb: 'SNAPBACK', title: 'BB 2.5 Exhaustion Reversal', quality, reasons, wf: pairAudit.snapback });
-    }
-
-    const snapSellStructural = nearResistance || fracRejectDn || aboveBB25 || realRSI >= 68;
-    const snapSellAction = prevUpperPct >= 30 || liveUpperPct >= 28 || patterns.isBearReversal || (prevBull && latest.close < prev.open);
-    if (
-      snapSellTrendGuard &&
-      aboveOuterZone &&
-      snapSellStructural &&
-      snapSellAction &&
-      isBearCandle &&
-      !liveOpposingSell &&
-      priceAboveEma20 &&
-      (stoch.k >= 72 || stoch.prevK >= 76 || stoch.prevRawK >= 82) &&
-      stochHookDn
-    ) {
-      const reasons = [
-        aboveBB25 ? 'BB 20/2.5 Upper Snapback' : 'Outer BB 2.5 Exhaustion',
-        `Stoch 14,3,3 Turn Dn (${stoch.k})`,
-        fracRejectDn ? 'Fractal-4 Resist Wall' : (nearResistance ? `Resist ${sr.resTouches}x Hold` : `Overbought RSI ${realRSI}`)
-      ];
-      let quality = 80;
-      if (aboveBB25) quality += 4;
-      if (patterns.bearPattern) { quality += 5; reasons.push(patterns.bearPattern); }
-      else if (Math.max(prevUpperPct, liveUpperPct) >= 34) { quality += 4; reasons.push(`Rejection Wick ${Math.max(prevUpperPct, liveUpperPct)}%`); }
-      if (nearResistance && sr.resTouches >= 2) quality += 3;
-      if (vel.snapRejectDown) { quality += 3; reasons.push('Live Snap Reject'); }
-      candidates.push({ dir: 'PUT', pb: 'SNAPBACK', title: 'BB 2.5 Exhaustion Reversal', quality, reasons, wf: pairAudit.snapback });
-    }
-
-    // --- PLAYBOOK C: FRACTAL-4 BREAK & RETEST / CANDLE #1 FRESH BB(20, 1.0) LAUNCH ---
-    const freshBB1BreakUp = !!(bb10 && prev.close <= bb10.upper && latest.close > bb10.upper && liveBodyPct >= 45 && liveUpperPct <= 22);
-    const freshBB1BreakDn = !!(bb10 && prev.close >= bb10.lower && latest.close < bb10.lower && liveBodyPct >= 45 && liveLowerPct <= 22);
-
-    if (
-      ema20SlopeUp &&
-      ema9Now >= ema20Now &&
-      priceAboveEma20 &&
-      (resToSupRetest || freshBB1BreakUp) &&
-      isBullCandle &&
-      !chasedTopBuy &&
-      !liveOpposingBuy &&
-      !wickTrend.upperWickWall &&
-      stoch.k >= 30 &&
-      stoch.k <= 74 &&
-      stochHookUp &&
-      runwayUp >= 0.30 &&
-      (distToResRatio >= 0.18 || fracBreakUp || resToSupRetest)
-    ) {
-      const reasons = [
-        resToSupRetest ? 'Fractal-4 Break & Retest' : 'Candle #1 BB 20/1 Launch',
-        `EMA 20 Rising · Stoch ${stoch.k}`,
-        `Open Runway ${Math.round(runwayUp * 100)}%`
-      ];
-      let quality = 79;
-      if (resToSupRetest) quality += 5;
-      if (stochCrossUp) quality += 3;
-      if (patterns.bullPattern) { quality += 4; reasons.push(patterns.bullPattern); }
-      if (vel.snapBounceUp) { quality += 3; reasons.push('Live Tick Drive UP'); }
-      candidates.push({ dir: 'CALL', pb: 'BREAK_RETEST', title: resToSupRetest ? 'Fractal-4 Retest Launch' : 'BB 20/1 Fresh Breakout', quality, reasons, wf: pairAudit.breakout });
-    }
-
-    if (
-      ema20SlopeDn &&
-      ema9Now <= ema20Now &&
-      priceBelowEma20 &&
-      (supToResRetest || freshBB1BreakDn) &&
-      isBearCandle &&
-      !chasedBotSell &&
-      !liveOpposingSell &&
-      !wickTrend.lowerWickWall &&
-      stoch.k >= 26 &&
-      stoch.k <= 70 &&
-      stochHookDn &&
-      runwayDn >= 0.30 &&
-      (distToSupRatio >= 0.18 || fracBreakDn || supToResRetest)
-    ) {
-      const reasons = [
-        supToResRetest ? 'Fractal-4 Break & Retest' : 'Candle #1 BB 20/1 Breakdown',
-        `EMA 20 Falling · Stoch ${stoch.k}`,
-        `Open Runway ${Math.round(runwayDn * 100)}%`
-      ];
-      let quality = 79;
-      if (supToResRetest) quality += 5;
-      if (stochCrossDn) quality += 3;
-      if (patterns.bearPattern) { quality += 4; reasons.push(patterns.bearPattern); }
-      if (vel.snapRejectDown) { quality += 3; reasons.push('Live Tick Drive DN'); }
-      candidates.push({ dir: 'PUT', pb: 'BREAK_RETEST', title: supToResRetest ? 'Fractal-4 Retest Drop' : 'BB 20/1 Fresh Breakdown', quality, reasons, wf: pairAudit.breakout });
-    }
-
-    // Live Directional Market Pressure Meter (for HUD visual needle only — NOT used to fire random signals!)
+    // Visual Directional Bias Meter for HUD Needle
     let bullBiasPts = 0;
     let bearBiasPts = 0;
-    if (priceAboveEma20) bullBiasPts += 22; else if (priceBelowEma20) bearBiasPts += 22;
-    if (ema20SlopeUp) bullBiasPts += 18; else if (ema20SlopeDn) bearBiasPts += 18;
-    if (stochHookUp) bullBiasPts += 16; else if (stochHookDn) bearBiasPts += 16;
+    if (latest.close > ema20Now) bullBiasPts += 24; else if (latest.close < ema20Now) bearBiasPts += 24;
+    if (ema20SlopeAtr >= 0.08) bullBiasPts += 18; else if (ema20SlopeAtr <= -0.08) bearBiasPts += 18;
+    if (stochLive.k > stochLive.prevK) bullBiasPts += 16; else if (stochLive.k < stochLive.prevK) bearBiasPts += 16;
     if (isBullCandle) bullBiasPts += 14; else if (isBearCandle) bearBiasPts += 14;
     if (wickTrend.bullWickTrend) bullBiasPts += 12; else if (wickTrend.bearWickTrend) bearBiasPts += 12;
     if (lastPOChartBuySentiment !== null) {
@@ -3980,17 +3824,18 @@
       marketBiasPct = 50;
     }
 
-    // 8. Zero-Lag Mode Calibration + Adaptive Walk-Forward Gating
+    // 6. Mode Calibration + Fresh-Candle Entry Window
     const expMs = Math.max(5000, expSec * 1000);
     const cfg = signalMode === 'ACTIVE'
-      ? { minCandles: 16, minQuality: 79, minPbWr: 52, minPairWr: 48, minSamples: 4, persistMs: 140, minScans: 2, cooldownMs: Math.max(7000, Math.round(expMs * 0.55)) }
+      ? { minCandles: 22, minQuality: 80, minPbWr: 52, minPairWr: 48, minSamples: 4, persistMs: 120, minScans: 1, cooldownMs: Math.max(6000, Math.round(expMs * 0.45)) }
       : signalMode === 'SNIPER'
-      ? { minCandles: 24, minQuality: 83, minPbWr: 65, minPairWr: 56, minSamples: 3, persistMs: 240, minScans: 2, cooldownMs: Math.max(12000, Math.round(expMs * 0.85)) }
-      : { minCandles: 20, minQuality: 80, minPbWr: 58, minPairWr: 52, minSamples: 3, persistMs: 180, minScans: 2, cooldownMs: Math.max(9000, Math.round(expMs * 0.70)) };
+      ? { minCandles: 26, minQuality: 84, minPbWr: 64, minPairWr: 56, minSamples: 3, persistMs: 180, minScans: 2, cooldownMs: Math.max(10000, Math.round(expMs * 0.75)) }
+      : { minCandles: 23, minQuality: 81, minPbWr: 58, minPairWr: 52, minSamples: 3, persistMs: 150, minScans: 2, cooldownMs: Math.max(8000, Math.round(expMs * 0.60)) };
 
-    const nowSec = Math.floor(now / 1000);
-    const remainingSec = tfSec - (nowSec % tfSec);
-    const dyingCandleGuard = remainingSec <= (tfSec >= 15 ? 2 : 1);
+    // Exact bar clock: only enter in the FIRST 68% of the fresh candle after a closed-candle setup (NEVER late!)
+    const barElapsedSec = ((now / 1000) % tfSec);
+    const remainingSec = Math.max(0, Math.ceil(tfSec - barElapsedSec));
+    const inFreshEntryWindow = barElapsedSec <= tfSec * 0.68;
 
     if (lockedSignal) {
       pendingSignalCandidate = null;
@@ -4003,36 +3848,54 @@
       return;
     }
 
-    // Pick best candidate boosted by live walk-forward edge on THIS pair
-    let bestCand = null;
-    let blockedByWfReason = '';
+    const closedBarKey = `${poAsset}|${currentTimeframe}|${prev.time || closedBars.length}|${prev.close}`;
+    const alreadyFiredThisBar = closedBarKey === lastFiredClosedBarKey;
     const pairUnstable = pairAudit.overall.total >= 5 && pairAudit.overall.wr < cfg.minPairWr;
 
-    if (candidates.length > 0) {
-      const scored = candidates.map(c => {
-        let adjQ = c.quality;
-        if (c.wf && c.wf.total >= 3) {
-          if (c.wf.wr >= 78) adjQ += 7;
-          else if (c.wf.wr >= 68) adjQ += 4;
-          else if (c.wf.wr < 55) adjQ -= 10;
-        }
-        return Object.assign({}, c, { adjQ });
-      }).sort((a, b) => b.adjQ - a.adjQ);
+    // Validate live candle follow-through / micro-retest (never buy into an immediate live dump or upper rejection wick!)
+    let bestCand = null;
+    let blockedReason = '';
 
-      for (const cand of scored) {
-        if (cand.adjQ < cfg.minQuality) continue;
-        if (cand.wf && cand.wf.total >= cfg.minSamples && cand.wf.wr < cfg.minPbWr) {
-          blockedByWfReason = `WF Guard: ${cand.pb} ${cand.wf.wr}% (${cand.wf.wins}W/${cand.wf.losses}L) · Waiting stronger setup`;
-          continue;
-        }
-        bestCand = cand;
-        break;
+    if (closedSetup && !alreadyFiredThisBar) {
+      const pbStats = pairAudit[closedSetup.pb] || { wins: 0, losses: 0, total: 0, wr: 0 };
+      let adjQ = closedSetup.quality;
+      if (pbStats.total >= 3) {
+        if (pbStats.wr >= 78) adjQ += 7;
+        else if (pbStats.wr >= 68) adjQ += 4;
+        else if (pbStats.wr < 54) adjQ -= 10;
+      }
+
+      const isBuy = closedSetup.dir === 'CALL';
+      // Allow tiny golden micro-dip up to 0.14 ATR for better entry, block genuine opposing dump or live wick wall!
+      const liveAgainstBuy = (latest.close < latest.open - atrUnit * 0.14) || liveUpperPct >= 36 || (vel.dir === 'SELL' && vel.strength >= 0.62) || wickTrend.upperWickWall;
+      const liveAgainstSell = (latest.close > latest.open + atrUnit * 0.14) || liveLowerPct >= 36 || (vel.dir === 'BUY' && vel.strength >= 0.62) || wickTrend.lowerWickWall;
+
+      // Also guard against buying directly into an established multi-touch ceiling (unless Sweep/Retest)
+      const distToResRatio = Math.max(0, (realResistance - latest.close) / range);
+      const distToSupRatio = Math.max(0, (latest.close - realSupport) / range);
+      const ceilingBlockedBuy = isBuy && distToResRatio < 0.14 && sr.resTouches >= 2 && closedSetup.pb !== 'BREAK_RETEST';
+      const floorBlockedSell = !isBuy && distToSupRatio < 0.14 && sr.supTouches >= 2 && closedSetup.pb !== 'BREAK_RETEST';
+
+      if (pbStats.total >= cfg.minSamples && pbStats.wr < cfg.minPbWr) {
+        blockedReason = `WF Guard: ${closedSetup.pb} ${pbStats.wr}% (${pbStats.wins}W/${pbStats.losses}L) · Skipping weak setup`;
+      } else if (isBuy && liveAgainstBuy) {
+        blockedReason = 'Live Rejection Guard · Fresh candle opposing BUY';
+      } else if (!isBuy && liveAgainstSell) {
+        blockedReason = 'Live Rejection Guard · Fresh candle opposing SELL';
+      } else if (ceilingBlockedBuy || floorBlockedSell) {
+        blockedReason = 'Multi-Touch S/R Wall Ahead · Protected against bounce trap';
+      } else if (adjQ >= cfg.minQuality) {
+        // Bonus if live candle already confirms green/red momentum follow-through
+        const extraReasons = [...closedSetup.reasons];
+        if (isBuy && vel.snapBounceUp) { adjQ += 2; extraReasons.push('Live Tick Follow-Through'); }
+        if (!isBuy && vel.snapRejectDown) { adjQ += 2; extraReasons.push('Live Tick Follow-Through'); }
+        bestCand = Object.assign({}, closedSetup, { adjQ, wf: pbStats, reasons: extraReasons });
       }
     }
 
     const wfTag = pairAudit.overall.total >= 3
       ? `Pair ${pairAudit.grade} (${pairAudit.overall.wr}% · ${pairAudit.overall.wins}W/${pairAudit.overall.losses}L)`
-      : `WF Learning (${pairAudit.overall.total} setups)`;
+      : `PA Scanning (${activeCandles.length}c)`;
 
     let signalVote = 'WAIT';
     let conf = 0;
@@ -4040,9 +3903,9 @@
       ? `Warming Price Action (${activeCandles.length}/${cfg.minCandles} bars) · Wait`
       : pairUnstable
       ? `⚠️ Choppy Pair (WF ${pairAudit.overall.wr}% · ${pairAudit.overall.wins}W/${pairAudit.overall.losses}L) · Switch Asset`
-      : `Scanning ${realTrend} · ${wfTag}`;
+      : `Waiting Closed-Candle Setup · ${realTrend} · ${wfTag}`;
     let activeReasons = bestCand
-      ? [...bestCand.reasons, wfTag]
+      ? [...bestCand.reasons.slice(0, 3), wfTag]
       : [
           `EMA 20: ${realTrend}`,
           `Stoch 14,3,3: ${realStochK}/${realStochD}`,
@@ -4053,18 +3916,17 @@
     const inCooldown = now < signalCooldownUntil;
     const cdRemSec = inCooldown ? Math.max(1, Math.ceil((signalCooldownUntil - now) / 1000)) : 0;
     const shieldCdActive = isDisciplineCooldownActive();
-    const isExtremeChop = recent.length >= 12 && er12 < 0.14 && Math.abs(ema20SlopeAtr) < 0.08 && !belowOuterZone && !aboveOuterZone;
-
-    const canFire = !shieldCdActive && !inCooldown && activeCandles.length >= cfg.minCandles && !isDeadFlat && !isWildSpike && !isIndecisiveDoji && !isExtremeChop && !pairUnstable;
+    const canFire = !shieldCdActive && !inCooldown && activeCandles.length >= cfg.minCandles && !isDeadFlat && !isWildSpike && !pairUnstable && inFreshEntryWindow;
     const candidateDir = canFire && bestCand ? bestCand.dir : null;
     let persistenceConfirmed = false;
 
-    if (candidateDir && !dyingCandleGuard) {
+    if (candidateDir) {
       if (
         pendingSignalCandidate &&
         pendingSignalCandidate.direction === candidateDir &&
         pendingSignalCandidate.asset === poAsset &&
-        pendingSignalCandidate.timeframe === currentTimeframe
+        pendingSignalCandidate.timeframe === currentTimeframe &&
+        pendingSignalCandidate.barKey === closedBarKey
       ) {
         pendingSignalCandidate.scans++;
         const heldMs = now - pendingSignalCandidate.firstSeenAt;
@@ -4077,21 +3939,24 @@
           firstSeenAt: now,
           scans: 1,
           asset: poAsset,
-          timeframe: currentTimeframe
+          timeframe: currentTimeframe,
+          barKey: closedBarKey
         };
+        if (cfg.minScans <= 1) persistenceConfirmed = true;
       }
-    } else if (!candidateDir) {
+    } else {
       pendingSignalCandidate = null;
     }
 
-    if (candidateDir && dyingCandleGuard) {
-      detectedPattern = `⚡ ${bestCand.title} Ready · Next candle open (${remainingSec}s)`;
+    if (bestCand && !inFreshEntryWindow && !shieldCdActive && !inCooldown && !pairUnstable) {
+      detectedPattern = `⚡ ${bestCand.title} · Late bar (${remainingSec}s left) · Waiting next`;
     } else if (candidateDir && !persistenceConfirmed) {
-      detectedPattern = `⚡ Locking ${bestCand.title} (${pendingSignalCandidate.scans}/${cfg.minScans})...`;
+      detectedPattern = `⚡ Confirming ${bestCand.title} (${pendingSignalCandidate.scans}/${cfg.minScans})...`;
     } else if (candidateDir && persistenceConfirmed && bestCand) {
       pendingSignalCandidate = null;
+      lastFiredClosedBarKey = closedBarKey;
       signalVote = candidateDir;
-      conf = Math.min(96, Math.max(80, Math.round(bestCand.adjQ)));
+      conf = Math.min(97, Math.max(81, Math.round(bestCand.adjQ)));
       const pbWfTag = bestCand.wf && bestCand.wf.total >= 2
         ? `WF ${bestCand.wf.wr}% (${bestCand.wf.wins}W/${bestCand.wf.losses}L)`
         : wfTag;
@@ -4105,12 +3970,8 @@
       detectedPattern = 'Flat micro-range · Waiting clean price movement';
     } else if (isWildSpike) {
       detectedPattern = 'Spike Guard · Waiting candle stabilization';
-    } else if (isIndecisiveDoji) {
-      detectedPattern = 'Doji Indecision · Waiting directional rejection';
-    } else if (isExtremeChop) {
-      detectedPattern = `Dead Chop (ER ${(er12 * 100).toFixed(0)}%) · Waiting Pullback or BB 2.5 Touch`;
-    } else if (blockedByWfReason) {
-      detectedPattern = blockedByWfReason;
+    } else if (blockedReason) {
+      detectedPattern = blockedReason;
     }
 
     currentPattern = detectedPattern;
@@ -4388,12 +4249,7 @@
       radarWickBar.textContent = `Upper ${wickMetrics.upperPct}% · Body ${wickMetrics.bodyPct}% · Lower ${wickMetrics.lowerPct}%`;
     }
     if (radarTrendLbl) {
-      const stLock = disciplineShield.strictTrendLock !== false;
-      radarTrendLbl.textContent = realTrend === 'UPTREND'
-        ? (stLock ? 'UPTREND · BUY ONLY' : 'UPTREND')
-        : realTrend === 'DOWNTREND'
-        ? (stLock ? 'DOWNTREND · SELL ONLY' : 'DOWNTREND')
-        : realTrend;
+      radarTrendLbl.textContent = realTrend;
       radarTrendLbl.style.color = realTrend === 'UPTREND' ? '#34d399' : realTrend === 'DOWNTREND' ? '#fb7185' : '#94a3b8';
     }
     if (radarConfList) {
@@ -11095,6 +10951,7 @@
           pendingSignalCandidate = null;
           pendingSignalAudit = null;
           pairRegimeCache = { key: '', data: null };
+          lastFiredClosedBarKey = '';
           currentPattern = `Scanning ${poAsset}...`;
           scanPOChartCanvas();
           updateSignalUI();
@@ -19934,7 +19791,7 @@
         const pill = shBtn.querySelector('.al-tb-pill');
         if (lbl) lbl.textContent = cdOn ? formatMMSS(rem) : 'Shield';
         if (pill) {
-          pill.style.display = (cdOn || disciplineShield.enabled || disciplineShield.strictTrendLock) ? 'inline-block' : 'none';
+          pill.style.display = (cdOn || disciplineShield.enabled) ? 'inline-block' : 'none';
           pill.textContent = cdOn ? 'LOCK' : 'ON';
         }
       }
@@ -19986,7 +19843,7 @@
             </span>
             <span class="al-tb-lbl">Pro Pen</span>
           </button>
-          <button type="button" class="al-tb-btn tb-shield" data-tb-act="shield" title="Anti-Tilt Discipline Shield &amp; Strict Trend-Lock">
+          <button type="button" class="al-tb-btn tb-shield" data-tb-act="shield" title="Anti-Tilt Discipline Shield">
             <span class="al-tb-pill">ON</span>
             <span class="al-tb-ico">
               <svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

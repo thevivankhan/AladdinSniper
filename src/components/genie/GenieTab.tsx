@@ -1567,7 +1567,7 @@ export const GenieTab: React.FC = () => {
           <span className="text-sm font-bold text-white flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             Auto-Update Bridge &amp; Extension Package
-            <span className="text-[11px] font-extrabold text-sky-400 bg-sky-500/15 border border-sky-500/35 px-1.5 py-0.5 rounded">Version 1.0.0.020</span>
+            <span className="text-[11px] font-extrabold text-sky-400 bg-sky-500/15 border border-sky-500/35 px-1.5 py-0.5 rounded">Version 1.0.0.021</span>
           </span>
           <div className="flex items-center gap-4 text-xs font-medium">
             <a
@@ -1576,7 +1576,7 @@ export const GenieTab: React.FC = () => {
               className="text-sky-400 hover:underline flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              Download Extension ZIP Version 1.0.0.020 (Edge / Chrome / Lemur)
+              Download Extension ZIP Version 1.0.0.021 (Edge / Chrome / Lemur)
             </a>
             <a
               href="/privacy.html"

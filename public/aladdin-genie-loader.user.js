@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie (Auto-Updating Loader) -> Pocket Option
 // @namespace    https://aladdinsniper.io
-// @version      1.0.0.020
-// @description  Permanent Auto-Loader Version 1.0.0.020 for AladdinGenie. Zero-Lag Market-Adaptive Price-Action Sniper Engine (5s/15s): Pullback-to-Value + BB(20/2.5) Exhaustion Snapback + Fractal-4 Break & Retest + Stoch(14,3,3) Zero-Lag Hook + Live Walk-Forward Pair-Edge Filter + 3L Discipline Shield.
+// @version      1.0.0.021
+// @description  Permanent Auto-Loader Version 1.0.0.021 for AladdinGenie. Pro Closed-Candle Price-Action Sniper Engine (5s/15s): Liquidity Sweep Pinbar + Full Closed Engulfing/Tweezer + Trend-Stoch EMA 20/BB(20/1.0) Pullback + Fractal-4 Break & Retest + Fresh-Bar Entry Window + 3L Discipline Shield (Strict Trend-Lock removed).
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*

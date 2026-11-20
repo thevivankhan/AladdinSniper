@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AladdinGenie - Pocket Option Floating Bot",
-  "version": "1.0.0.20",
-  "version_name": "1.0.0.020",
-  "description": "AladdinGenie Version 1.0.0.020: Zero-Lag Market-Adaptive Price-Action Sniper Engine (5s/15s) — Pullback-to-Value + BB(20/2.5) Exhaustion Snapback + Fractal-4 Break & Retest + Stoch(14,3,3) Zero-Lag Hook + Live Walk-Forward Pair-Edge Filter + 3L Discipline Shield.",
+  "version": "1.0.0.21",
+  "version_name": "1.0.0.021",
+  "description": "AladdinGenie Version 1.0.0.021: Pro Closed-Candle Price-Action Sniper Engine (5s/15s) — Liquidity Sweep Pinbar + Full Closed Engulfing/Tweezer + Trend-Stoch EMA 20/BB(20/1.0) Pullback + Fractal-4 Break & Retest + Fresh-Bar Entry Window + 3L Discipline Shield.",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
