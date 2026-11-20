@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie (Auto-Updating Loader) -> Pocket Option
 // @namespace    https://aladdinsniper.io
-// @version      1.0.0.022
-// @description  Permanent Auto-Loader Version 1.0.0.022 for AladdinGenie. Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper Engine — EMA 20 / BB(20,1.0) / BB(20,2.5) / Fractal-4 / Zero-Lag Stoch(14,3,3) + Dynamic HTF Sync + Anti-Opposite Trend Guard + Fast Proportional Cadence + 3L Discipline Shield.
+// @version      1.0.0.023
+// @description  Permanent Auto-Loader Version 1.0.0.023 for AladdinGenie. Clean Minimal Manager Layout (Paradox|Signal side-by-side + Compact ATM inside Session bar) + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield.
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Aladdin Genie -> Pocket Option Floating Bot Overlay (Lemur & Quetta Edition)
 // @namespace    https://aladdinsniper.io
-// @version      1.0.0.022
-// @description  AladdinGenie Version 1.0.0.022: Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper — EMA 20 / BB(20,1.0) / BB(20,2.5) / Fractal-4 / Zero-Lag Stoch(14,3,3) + Dynamic HTF Sync + Anti-Opposite Trend Guard + Anti-Exhaustion + Hybrid Live/Closed Entry + 3L Discipline Shield
+// @version      1.0.0.023
+// @description  AladdinGenie Version 1.0.0.023: Clean Minimal Manager Layout (Paradox|Signal side-by-side + Compact ATM inside Session bar) + Adaptive OTC & All-Timeframe Zero-Lag Price-Action Sniper + 3L Discipline Shield
 // @match        https://*.p.finance/*
 // @match        https://m.p.finance/*
 // @match        https://*.pocketoption.com/*
@@ -24,7 +24,7 @@
   if (window.__ALADDIN_GENIE_INJECTED__) return;
   window.__ALADDIN_GENIE_INJECTED__ = true;
 
-  const ALADDIN_VERSION = '1.0.0.022';
+  const ALADDIN_VERSION = '1.0.0.023';
   let isRecActiveFlag = false;
   console.log(`[AladdinGenie] Version ${ALADDIN_VERSION} Initializing (AladdinAI Toolbox + Real-Time 60fps VSync-Locked Screen Capture)`);
 
@@ -10026,14 +10026,13 @@
           <div class="al-tm-utility-grid">
             <button data-tm-act="logSession" class="al-tm-util-btn al-tm-util-flat-amber">Log Session</button>
             <button data-tm-act="copyBalance" class="al-tm-util-btn al-tm-util-flat-emerald">Copy Bal</button>
-            <button data-tm-act="recATM" ${canAtmClick ? '' : 'disabled'} class="al-tm-util-btn al-tm-util-flat-blue" title="Record ATM Tie / Refund ($0)">ATM</button>
+            <button data-top-tab="paradox" class="al-tm-util-btn al-tm-util-flat-amber" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Open Paradox Matrix (${chState.activeMode} · 111/222/333/444)">
+              ${AL_SVG.zap}
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isPx ? `Paradox · ${pxCtx.mode} P${pxCtx.pIdx + 1}` : `Paradox · ${chState.activeMode}`}</span>
+            </button>
             <button data-top-tab="radar" class="al-tm-util-btn al-tm-util-flat-signal" title="Open Live Signal Scanner">
               <span id="al-tm-sig-dot" class="al-tm-sig-dot ${realSignal === 'CALL' ? 'call' : realSignal === 'PUT' ? 'put' : ''}"></span>
               <span>Signal</span>
-            </button>
-            <button data-top-tab="paradox" style="grid-column: 1 / -1;" class="al-tm-util-btn al-tm-util-flat-amber" title="Open Paradox Matrix (${chState.activeMode} · 111/222/333/444)">
-              ${AL_SVG.zap}
-              <span>Paradox · ${isPx ? `${pxCtx.mode} P${pxCtx.pIdx + 1} (${pxCtx.plan.title})` : `${chState.activeMode} Mode`}</span>
             </button>
           </div>
           ${buildSniperActionControlHTML(nextStake, isPx ? Math.round((chState.payoutRate || 0.92) * 100) : tmState.payoutRate, {
@@ -10051,6 +10050,7 @@
           <div class="al-tm-counter-bar">
             <span style="font-size:10.5px;font-weight:800;color:#7dd3fc;">Session #${tmState.sessionCounter}</span>
             <div style="display:flex;align-items:center;gap:5px;">
+              <button data-tm-act="recATM" ${canAtmClick ? '' : 'disabled'} class="al-tm-util-btn al-tm-util-flat-blue" style="height:24px;min-width:42px;padding:0 9px;font-size:10px;border-radius:3px;" title="Record ATM Tie / Refund ($0)">ATM</button>
               <button data-tm-act="counterUp" class="al-tm-cnt-btn up${tmCounterPushDir === 'up' ? ' al-pushed' : ''}" title="Counter +1">▲</button>
               <button data-tm-act="counterDown" class="al-tm-cnt-btn dn${tmCounterPushDir === 'dn' ? ' al-pushed' : ''}" title="Counter -1">▼</button>
             </div>
